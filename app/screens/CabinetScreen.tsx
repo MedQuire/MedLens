@@ -35,6 +35,11 @@ const DRUG_DESCRIPTIONS: Record<string, string> = {
   'lipitor': 'Cholesterol management',
   'amoxicillin': 'Antibiotic',
   'xanax': 'Anxiety management',
+  'augmentin': 'Antibiotic',
+  'sertraline': 'Depression & anxiety',
+  'tramadol': 'Pain management',
+  'diclofenac': 'Pain & inflammation',
+  'piroxicam': 'Pain & inflammation',
 };
 
 const getDrugDescription = (name: string): string => {
@@ -296,7 +301,7 @@ const CabinetScreen: React.FC = () => {
             {item.drug_name}
           </Text>
           <Text style={[styles.medDesc, { color: theme.colors.outline }]} numberOfLines={1}>
-            {getDrugDescription(item.drug_name)}
+            {item.description || getDrugDescription(item.drug_name)}
           </Text>
         </View>
 

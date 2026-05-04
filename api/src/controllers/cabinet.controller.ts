@@ -53,7 +53,7 @@ export const getCabinetItems = async (req: AuthenticatedRequest, res: Response) 
 };
 
 export const saveCabinetItem = async (req: AuthenticatedRequest, res: Response) => {
-  const { drug_name, drug_key } = req.body;
+  const { drug_name, drug_key, description } = req.body;
   console.log(`[Cabinet] Saving ${drug_name} for user: ${req.userId}`);
 
   if (!drug_name || !drug_key) {
@@ -63,18 +63,24 @@ export const saveCabinetItem = async (req: AuthenticatedRequest, res: Response) 
   try {
     const supabase = getUserScopedClient(req.userToken!);
 
-    console.log(`[Cabinet] Attempting save for user ${req.userId} on drug ${drug_key}`);
+    console.log(`[Cabinet] Attempting save for user ${req.userId} on drug ${drug_key} with desc: ${description}`);
 
     // Try to insert first
-    const { data, error, status } = await supabase
+    let { data, error, status } = await supabase
       .from('cabinet_items')
-      .insert([{ user_id: req.userId, drug_name, drug_key, source: 'OpenFDA' }])
+      .insert([{ 
+        user_id: req.userId, 
+        drug_name, 
+        drug_key, 
+        description,
+        source: 'OpenFDA' 
+      }])
       .select()
       .single();
 
     if (error) {
+      // ── Fallback ──
       // If the error is a unique violation (code 23505), it means the item was already saved.
-      // We can just return success or update it.
       if (error.code === '23505') {
         console.log(`[Cabinet] Item already exists for user ${req.userId}, returning existing data.`);
         const { data: existingData, error: fetchError } = await supabase
@@ -90,15 +96,50 @@ export const saveCabinetItem = async (req: AuthenticatedRequest, res: Response) 
         return res.json({ success: true, item: existingData });
       }
 
-      console.error(`[Cabinet] Save error (Status ${status}):`, error.message);
-      
-      if (error.message.includes('schema cache')) {
-        return res.status(503).json({ 
-          error: 'Cabinet service is initializing', 
-          message: 'The database schema is being refreshed. Please try again in a few moments.' 
-        });
+      // If the error is a missing column or schema cache issue, try falling back to save without description
+      const isMissingColumn = error.message?.includes('column "description" does not exist') || 
+                               error.message?.includes('column cabinet_items.description does not exist');
+      const isSchemaCache = error.message?.includes('schema cache');
+
+      if (isMissingColumn || isSchemaCache) {
+        console.warn(`[Cabinet] Migration not applied or cache stale. Falling back to save without description. Error: ${error.message}`);
+        
+        const fallbackResult = await supabase
+          .from('cabinet_items')
+          .insert([{ 
+            user_id: req.userId, 
+            drug_name, 
+            drug_key, 
+            source: 'OpenFDA' 
+          }])
+          .select()
+          .single();
+        
+        if (!fallbackResult.error) {
+          console.log(`[Cabinet] Fallback save successful for ${drug_name}`);
+          return res.json({ success: true, item: fallbackResult.data });
+        } else if (fallbackResult.error.code === '23505') {
+            // Handle unique violation in fallback too
+            const { data: existingData } = await supabase
+                .from('cabinet_items')
+                .select()
+                .match({ user_id: req.userId, drug_key })
+                .single();
+            return res.json({ success: true, item: existingData });
+        }
+        
+        // If fallback also fails, return the 503 if it's still a schema cache issue
+        if (fallbackResult.error.message?.includes('schema cache')) {
+            return res.status(503).json({ 
+                error: 'Cabinet service is initializing', 
+                message: 'The database schema is being refreshed. Please try again in a few moments.' 
+            });
+        }
+        
+        return res.status(500).json({ error: 'Failed to save medication', message: fallbackResult.error.message });
       }
 
+      console.error(`[Cabinet] Save error (Status ${status}):`, error.message);
       return res.status(500).json({ error: 'Failed to save medication', message: error.message });
     }
 

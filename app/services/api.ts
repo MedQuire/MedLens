@@ -54,6 +54,7 @@ export interface CabinetItem {
   created_at: string;
   updated_at: string;
   last_accessed_at?: string;
+  description?: string;
 }
 
 export interface DrugData {
@@ -233,13 +234,13 @@ export async function checkInteractions(drugKeys: string[]): Promise<Interaction
 }
 
 // Cabinet operations
-export async function saveCabinetItem(drugName: string, drugKey: string, token: string): Promise<{ success: boolean; item: CabinetItem }> {
+export async function saveCabinetItem(drugName: string, drugKey: string, token: string, description?: string): Promise<{ success: boolean; item: CabinetItem }> {
   return apiRequest<{ success: boolean; item: CabinetItem }>(Config.ENDPOINTS.CABINET_SAVE, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ drug_name: drugName, drug_key: drugKey }),
+    body: JSON.stringify({ drug_name: drugName, drug_key: drugKey, description }),
   });
 }
 

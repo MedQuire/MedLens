@@ -313,8 +313,9 @@ const HomeScreen: React.FC = () => {
     // 3. Trigger context method
     (async () => {
       try {
-        await addToCabinet(drugName, drugKey);
-        console.log(`[Cabinet] Add successful for: ${drugName}`);
+        const description = baseResult.summary.what_it_does || undefined;
+        await addToCabinet(drugName, drugKey, description);
+        console.log(`[Cabinet] Add successful for: ${drugName} with desc: ${description}`);
       } catch (error) {
         console.error('[Cabinet] Save failed:', error);
       }

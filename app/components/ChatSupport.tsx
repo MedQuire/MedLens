@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -61,6 +62,9 @@ const ChatSupport: React.FC<ChatSupportProps> = ({ autoFocus }) => {
 
   const handleSend = async () => {
     if (!inputText.trim() || isTyping) return;
+
+    // Dismiss keyboard immediately for smoother flow
+    Keyboard.dismiss();
 
     const userMessage = inputText.trim();
     setInputText('');

@@ -10,7 +10,7 @@ interface CabinetContextType {
   savedDrugKeys: Set<string>;
   loading: boolean;
   refreshCabinet: () => Promise<void>;
-  addItem: (drugName: string, drugKey: string) => Promise<void>;
+  addItem: (drugName: string, drugKey: string, description?: string) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
 }
 
@@ -87,14 +87,14 @@ export const CabinetProvider: React.FC<{ children: React.ReactNode }> = ({ child
     refreshCabinet();
   }, [refreshCabinet]);
 
-  const addItem = useCallback(async (drugName: string, drugKey: string) => {
+  const addItem = useCallback(async (drugName: string, drugKey: string, description?: string) => {
     if (isGuest || !user) return;
 
     try {
       const token = await getToken();
       if (!token) return;
 
-      const response = await api.saveCabinetItem(drugName, drugKey, token);
+      const response = await api.saveCabinetItem(drugName, drugKey, token, description);
       if (response.success) {
         // Update state and cache immediately, ensuring no duplicate items are added
         setItems(prev => {
