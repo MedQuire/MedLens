@@ -307,6 +307,9 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'flex-start',
+    backgroundColor: '#F0F4FF',
+    borderRadius: 8,
+    paddingHorizontal: 8,
   },
   userEmail: {
     fontSize: 12,
