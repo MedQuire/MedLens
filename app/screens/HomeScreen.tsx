@@ -44,7 +44,7 @@ const HomeScreen: React.FC = () => {
   const [isELI12, setIsELI12] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  
+
   // Performance and Cache Refs
   const sessionCache = useRef<Map<string, api.SearchResponse>>(new Map());
   const abortController = useRef<AbortController | null>(null);
@@ -53,7 +53,7 @@ const HomeScreen: React.FC = () => {
 
   const prefetchELI12 = useCallback(async (data: any, summary: any) => {
     if (!data || !summary) return;
-    
+
     // 1. If we already have the ELI12 result from the initial search, skip the call
     if (baseResult?.eli12?.enabled && baseResult.eli12.content) {
       console.log('[Perf] Using pre-generated ELI12 content');
@@ -72,7 +72,7 @@ const HomeScreen: React.FC = () => {
       // Don't log abort or common timeout errors as failures for background tasks
       const isAbort = error instanceof Error && (error.name === 'AbortError' || error.message.includes('Aborted'));
       if (isAbort) return;
-      
+
       console.warn('Background ELI12 prefetch failed (will retry on manual toggle):', error);
     }
   }, [baseResult]);
@@ -80,9 +80,9 @@ const HomeScreen: React.FC = () => {
   const handleToggleELI12 = useCallback(async (enabled: boolean) => {
     setIsELI12(enabled);
     LocalStorageService.updateSettings({ eli12Enabled: enabled });
-    
+
     if (!baseResult) return;
-    
+
     if (enabled && !eli12Result) {
       setState('loading');
       await prefetchELI12(baseResult.data, baseResult.summary);
@@ -93,13 +93,13 @@ const HomeScreen: React.FC = () => {
   const handleSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     const cleanQuery = searchQuery.trim().toLowerCase();
-    
+
     // 1. Cancel previous in-flight request
     if (abortController.current) {
       abortController.current.abort();
     }
     abortController.current = new AbortController();
-    
+
     setQuery(searchQuery.trim());
     setState('loading');
     setEli12Result(null);
@@ -110,12 +110,12 @@ const HomeScreen: React.FC = () => {
       if (sessionCache.current.has(cleanQuery)) {
         const cached = sessionCache.current.get(cleanQuery)!;
         setBaseResult(cached);
-        
+
         if (cached.eli12?.enabled && cached.eli12.content) {
           const content = cached.eli12.content;
           setEli12Result(typeof content === 'string' ? JSON.parse(content) : content);
         }
-        
+
         setState('success');
         console.log(`[Perf] Memory cache hit for: ${cleanQuery}`);
         return;
@@ -126,34 +126,34 @@ const HomeScreen: React.FC = () => {
       if (diskCached) {
         sessionCache.current.set(cleanQuery, diskCached);
         setBaseResult(diskCached);
-        
+
         if (diskCached.eli12?.enabled && diskCached.eli12.content) {
           const content = diskCached.eli12.content;
           setEli12Result(typeof content === 'string' ? JSON.parse(content) : content);
         } else {
           prefetchELI12(diskCached.data, diskCached.summary);
         }
-        
+
         setState('success');
         console.log(`[Perf] Disk cache hit for: ${cleanQuery}`);
         return;
       }
 
       // 4. API Fetch with Timeout handling
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('TIMEOUT')), 60000) // Increased to 60s to allow deep AI response time
       );
-      
-      const slowIndicatorPromise = new Promise((resolve) => 
+
+      const slowIndicatorPromise = new Promise((resolve) =>
         setTimeout(() => resolve('SLOW'), 12000) // Show status after 12s
       );
 
       const fetchPromise = api.searchMedication(searchQuery.trim(), false);
-      
+
       // Use a more nuanced race to handle the slow status
       let response: api.SearchResponse;
       const result = await Promise.race([fetchPromise, timeoutPromise, slowIndicatorPromise]);
-      
+
       if (result === 'SLOW') {
         console.log('[Perf] Search is slow, showing status update...');
         // Here we could update a status state if we had one, 
@@ -162,13 +162,13 @@ const HomeScreen: React.FC = () => {
       } else {
         response = result as api.SearchResponse;
       }
-      
+
       const duration = Math.round(performance.now() - searchStartTime.current);
       console.log(`[Perf] API Search took ${duration}ms for: ${cleanQuery}`);
 
       sessionCache.current.set(cleanQuery, response);
       setBaseResult(response);
-      
+
       // 5. If ELI12 was pre-generated, set it immediately
       if (response.eli12?.enabled && response.eli12.content) {
         console.log('[Perf] Instant ELI12 loaded from initial search');
@@ -184,7 +184,7 @@ const HomeScreen: React.FC = () => {
 
       // Async persistence
       LocalStorageService.setCachedResult(cleanQuery, response);
-      
+
       const queryToSave = searchQuery.trim();
       // Save to local storage for instant availability in the drawer
       LocalStorageService.addRecentSearch(queryToSave, user?.id)
@@ -214,7 +214,7 @@ const HomeScreen: React.FC = () => {
 
     } catch (error: any) {
       if (error.name === 'AbortError') return;
-      
+
       // Handle known 404 (Medication not found) cases without triggering error screens
       const isNotFound = error.status === 404 || error.message?.includes('404');
       if (isNotFound) {
@@ -226,7 +226,7 @@ const HomeScreen: React.FC = () => {
       console.error('Search error:', error);
       if (error.message === 'TIMEOUT') {
         Alert.alert(
-          'Still Working', 
+          'Still Working',
           'The clinical summary is taking a bit longer to generate than usual. We are still working on it!',
           [{ text: 'Wait', style: 'default' }, { text: 'Cancel', style: 'cancel', onPress: () => setState('error') }]
         );
@@ -237,9 +237,9 @@ const HomeScreen: React.FC = () => {
           setBaseResult(finalResponse);
           setState('success');
           return;
-        } catch (e) {}
+        } catch (e) { }
       }
-      
+
       const message = error.message || '';
       setState(message.includes('not found') || message.includes('404') ? 'notFound' : 'error');
     }
@@ -248,10 +248,10 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    
+
     const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-    
+
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -261,7 +261,7 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     // Check for navigation params if we came from drawer search
     const searchQuery = route.params?.searchQuery;
-    
+
     if (searchQuery) {
       console.log(`[Home] Navigation query detected: ${searchQuery}`);
       handleSearch(searchQuery);
@@ -294,22 +294,22 @@ const HomeScreen: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     if (!baseResult) return;
-    if (isGuest) { 
+    if (isGuest) {
       // Save context before auth transition
       LocalStorageService.setPendingSearch(query, isELI12, 'save');
       navigation.navigate('SignUp');
-      return; 
+      return;
     }
-    
+
     const drugName = baseResult.drug_name;
     const drugNameLower = drugName.toLowerCase();
     const drugKey = drugNameLower.replace(/\s+/g, '-');
 
     // 1. Optimistic Update is handled inside CabinetContext via state updates
-    
+
     // 2. Immediate Feedback: Show alert right away
     Alert.alert('Saved', `${drugName} has been saved to your cabinet.`);
-    
+
     // 3. Trigger context method
     (async () => {
       try {
@@ -330,17 +330,17 @@ const HomeScreen: React.FC = () => {
 
   const handleExport = useCallback(async () => {
     if (!baseResult) return;
-    if (isGuest) { 
+    if (isGuest) {
       // Save context before auth transition
       LocalStorageService.setPendingSearch(query, isELI12, 'export');
       navigation.navigate('SignUp');
-      return; 
+      return;
     }
     const currentSummary = isELI12 && eli12Result ? eli12Result : baseResult.summary;
-    
-    try { 
+
+    try {
       setExportLoading(true);
-      
+
       const uri = await PDFService.generateMedicationReport({
         drugName: baseResult.drug_name,
         source: baseResult.source,
@@ -353,14 +353,14 @@ const HomeScreen: React.FC = () => {
         }
       });
 
-      await Sharing.shareAsync(uri, { 
-        mimeType: 'application/pdf', 
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
         dialogTitle: `Medication Report: ${baseResult.drug_name}`,
         UTI: 'com.adobe.pdf'
       });
     }
-    catch (error: any) { 
-      console.error('PDF export failed:', error); 
+    catch (error: any) {
+      console.error('PDF export failed:', error);
       Alert.alert('Export Failed', 'We could not generate the medical report PDF. Please try again.');
     } finally {
       setExportLoading(false);
@@ -375,17 +375,17 @@ const HomeScreen: React.FC = () => {
         if (pending && pending.query) {
           console.log(`[Home] Restoring pending search context: ${pending.query}`);
           setIsELI12(pending.eli12);
-          
+
           // Execute search
           await handleSearch(pending.query);
-          
+
           // Handle pending action if any
           if (pending.action === 'save') {
             setPendingAction('save');
           } else if (pending.action === 'export') {
             setPendingAction('export');
           }
-          
+
           await LocalStorageService.clearPendingSearch();
         }
       }
@@ -412,9 +412,9 @@ const HomeScreen: React.FC = () => {
       // suggestions are already debounced in InputBar component
       const response = await api.getAutocomplete(suggestionQuery);
       return response.suggestions || [];
-    } catch (error: any) { 
+    } catch (error: any) {
       if (error.name === 'AbortError') return [];
-      return []; 
+      return [];
     }
   }, []);
 
@@ -435,7 +435,7 @@ const HomeScreen: React.FC = () => {
       case 'partial':
         if (!baseResult) return null;
         const currentSummary = (isELI12 && eli12Result) ? eli12Result : baseResult.summary;
-        
+
         return (
           <View style={styles.resultContainer}>
             <SummaryCard
@@ -479,8 +479,8 @@ const HomeScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={styles.keyboardView}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         {/* Static Background Headline */}
@@ -514,10 +514,10 @@ const HomeScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[
-                styles.profileCircle, 
-                { 
-                  backgroundColor: user ? theme.colors.onSurfaceVariant : theme.colors.outlineVariant, 
-                  borderWidth: 0 
+                styles.profileCircle,
+                {
+                  backgroundColor: user ? theme.colors.onSurfaceVariant : theme.colors.outlineVariant,
+                  borderWidth: 0
                 }
               ]}
               onPress={() => navigation.navigate('Settings')}
@@ -561,7 +561,7 @@ const HomeScreen: React.FC = () => {
             onToggleEli12={handleToggleELI12}
           />
         </View>
-    </SafeAreaView>
+      </SafeAreaView>
 
     </KeyboardAvoidingView>
   );

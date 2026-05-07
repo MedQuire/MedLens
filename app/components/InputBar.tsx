@@ -5,7 +5,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Vibration } from 'react-native';
 // Safe import: expo-speech-recognition requires a development build (not available in Expo Go)
 let SpeechModule: any = null;
-let useSpeechEvent: any = () => {};
+let useSpeechEvent: any = () => { };
 try {
   const speech = require('expo-speech-recognition');
   SpeechModule = speech.ExpoSpeechRecognitionModule;
@@ -52,7 +52,7 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
   const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
-  
+
   const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestFetchId = useRef(0);
   const inputShadow = useRef(new Animated.Value(0)).current;
@@ -60,41 +60,39 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
   const pulseAnimation = useRef<Animated.CompositeAnimation | null>(null);
   const inputRef = useRef<TextInput>(null);
 
-  // ── On-Device Speech Recognition Events (only if native module is available) ──
-  useEffect(() => {
-    if (!SpeechModule) return;
-
-    const resultSub = useSpeechEvent('result', (event: any) => {
-      const transcript = event.results[0]?.transcript;
-      if (transcript && transcript.length > 0) {
-        setQuery(transcript);
-        if (event.isFinal) {
-          setIsTranscribing(false);
-          Vibration.vibrate(100);
-        }
+  // ── On-Device Speech Recognition Events ──
+  const handleResult = (event: any) => {
+    const transcript = event.results[0]?.transcript;
+    if (transcript && transcript.length > 0) {
+      setQuery(transcript);
+      if (event.isFinal) {
+        setIsTranscribing(false);
+        Vibration.vibrate(100);
       }
-    });
+    }
+  };
 
-    const endSub = useSpeechEvent('end', () => {
-      setIsListening(false);
-      setIsTranscribing(false);
-    });
+  const handleEnd = () => {
+    setIsListening(false);
+    setIsTranscribing(false);
+  };
 
-    const errorSub = useSpeechEvent('error', (event: any) => {
-      setIsListening(false);
-      setIsTranscribing(false);
-      if (event.error === 'not-allowed') {
-        Alert.alert(
-          "Permission Required",
-          "MedQuire needs microphone and speech recognition access. Please enable them in your settings.",
-          [{ text: "OK" }]
-        );
-      }
-    });
+  const handleError = (event: any) => {
+    setIsListening(false);
+    setIsTranscribing(false);
+    if (event.error === 'not-allowed') {
+      Alert.alert(
+        "Permission Required",
+        "MedQuire needs microphone and speech recognition access. Please enable them in your settings.",
+        [{ text: "OK" }]
+      );
+    }
+  };
 
-    return () => {
-    };
-  }, []);
+  // Only call hooks at top level, not inside useEffect
+  useSpeechEvent('result', SpeechModule ? handleResult : () => { });
+  useSpeechEvent('end', SpeechModule ? handleEnd : () => { });
+  useSpeechEvent('error', SpeechModule ? handleError : () => { });
 
   React.useImperativeHandle(ref, () => ({
     clear: () => {
@@ -110,7 +108,7 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
   const mergeResults = (local: Suggestion[], remote: Suggestion[]) => {
     const seen = new Set(local.map(s => s.name?.toLowerCase() || ''));
     const merged = [...local];
-    
+
     if (Array.isArray(remote)) {
       remote.forEach(r => {
         const normalizedName = r.name?.toLowerCase();
@@ -120,14 +118,14 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
         }
       });
     }
-    
+
     setSuggestions(merged.slice(0, 10));
   };
 
   // ── Autocomplete Logic ──
   useEffect(() => {
     const trimmed = query.trim().toLowerCase();
-    
+
     // Clear any pending API calls
     if (debounceTimeout.current) {
       clearTimeout(debounceTimeout.current);
@@ -144,8 +142,8 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
     // 1. Instant Local Filter (Synchronous)
     // Strictly filter based on current query
     const localMatches: Suggestion[] = (COMMON_DRUGS as any[])
-      .filter(d => 
-        (d.name?.toLowerCase() || '').startsWith(trimmed) || 
+      .filter(d =>
+        (d.name?.toLowerCase() || '').startsWith(trimmed) ||
         (d.drug_name?.toLowerCase() || '').startsWith(trimmed)
       )
       .slice(0, 5)
@@ -168,7 +166,7 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
       setIsSuggestionsLoading(true);
       try {
         const results = await fetchSuggestions(query);
-        
+
         // ONLY update if this is still the latest fetch request
         if (currentFetchId === latestFetchId.current) {
           mergeResults(localMatches, results);
@@ -266,7 +264,7 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
 
   const toggleListening = () => {
     if (isTranscribing && !isListening) return;
-    
+
     if (isListening) {
       stopListening();
     } else {
@@ -285,21 +283,21 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
 
   const handleSuggestionPress = (suggestion: Suggestion) => {
     if (!suggestion || !suggestion.name) return;
-    
+
     const drugName = suggestion.name.trim();
-    
+
     // 1. Instantly hide suggestions and clear state
     setShowSuggestions(false);
     setSuggestions([]);
     setIsSuggestionsLoading(false);
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-    
+
     // 2. Sync input value
     setQuery('');
-    
+
     // 3. Dismiss keyboard
     Keyboard.dismiss();
-    
+
     // 4. Trigger search instantly in parent (behaving like 'send')
     if (drugName) {
       onSubmit(drugName, eli12Enabled);
@@ -349,10 +347,10 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
       style={styles.container}
     >
       <View style={styles.mainWrapper}>
-        <Animated.View 
+        <Animated.View
           style={[
-            styles.inputWrapper, 
-            { 
+            styles.inputWrapper,
+            {
               backgroundColor: theme.colors.surface,
               shadowOpacity: shadowOpacity,
               borderColor: query.trim() ? theme.colors.primaryContainer : theme.colors.outlineVariant,
@@ -376,8 +374,8 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
             autoFocus={autoFocus}
           />
           <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              style={[styles.micButton, isListening && { backgroundColor: theme.colors.primaryContainer + '40', borderRadius: 20 }]} 
+            <TouchableOpacity
+              style={[styles.micButton, isListening && { backgroundColor: theme.colors.primaryContainer + '40', borderRadius: 20 }]}
               onPress={query.trim().length > 0 ? handleSubmit : toggleListening}
               disabled={isTranscribing}
             >
@@ -385,10 +383,10 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
                 {isTranscribing ? (
                   <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : (
-                  <Ionicons 
+                  <Ionicons
                     name={query.trim().length > 0 ? "send" : (isListening ? "mic" : "mic-outline")}
-                    size={22} 
-                    color={(isListening || query.trim().length > 0) ? theme.colors.primary : theme.colors.onSurfaceVariant} 
+                    size={22}
+                    color={(isListening || query.trim().length > 0) ? theme.colors.primary : theme.colors.onSurfaceVariant}
                   />
                 )}
               </Animated.View>
@@ -396,10 +394,10 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
           </View>
         </Animated.View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.eliButton, 
-            { 
+            styles.eliButton,
+            {
               backgroundColor: eli12Enabled ? theme.colors.primary : theme.colors.surface,
               borderColor: theme.colors.primary,
               borderWidth: 1,
@@ -412,7 +410,7 @@ const InputBar = React.forwardRef<InputBarHandle, InputBarProps>(({
             <Ionicons name="checkmark-circle" size={16} color={theme.colors.onPrimary} />
           )}
           <Animated.Text style={[
-            styles.eliButtonText, 
+            styles.eliButtonText,
             { color: eli12Enabled ? theme.colors.onPrimary : theme.colors.primary }
           ]}>
             ELI 12

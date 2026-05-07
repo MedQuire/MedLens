@@ -33,7 +33,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
     const checkRouting = async () => {
       console.log('[Splash] Initializing routing check...');
-      
+
       try {
         // FOR DEVELOPMENT: Reset onboarding so you can see the changes
         await LocalStorageService.resetOnboarding();
@@ -41,14 +41,14 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         // Balanced visibility time for premium feel (4 seconds)
         // This allows session checks to complete in the background while the user sees the brand
         const startTime = Date.now();
-        
+
         const isAuthenticated = !!session?.user;
         const hasAuthenticatedBefore = await LocalStorageService.getHasAuthenticatedBefore();
         const onboardingCompleted = await LocalStorageService.getOnboardingCompleted();
 
         // Calculate remaining time to hit the ~4s mark
         const elapsed = Date.now() - startTime;
-        const remaining = Math.max(4000 - elapsed, 500); 
+        const remaining = Math.max(4000 - elapsed, 500);
         await new Promise(resolve => setTimeout(resolve, remaining));
 
         console.log('[Splash] Routing Diagnosis:');
@@ -89,12 +89,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   }, [authLoading, session, navigation]);
 
   return (
-    <Animated.View style={[styles.container, { backgroundColor: theme.colors.primaryContainer, opacity: screenOpacity }]}>
+    <Animated.View style={[styles.container, { backgroundColor: '#F0F4FF', opacity: screenOpacity }]}>
       <StatusBar barStyle="dark-content" />
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.content, 
-          { 
+          styles.content,
+          {
             opacity: fadeAnim,
             transform: [{ scale: scaleAnim }]
           }
@@ -104,7 +104,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           <SvgXml xml={LOGO_SVG} width={200} height={100} />
         </View>
       </Animated.View>
-      
+
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: theme.colors.onPrimaryContainer }]}>
           Your Medication Simplified
