@@ -24,7 +24,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   continueAsGuest: () => Promise<void>;
-  getToken: () => Promise<string | null>;
+  getToken: (forceRefresh?: boolean) => Promise<string | null>;
   updateProfile: (data: { full_name?: string; email?: string }) => Promise<{ error: Error | null }>;
   deleteAccount: () => Promise<{ error: Error | null }>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
@@ -331,6 +331,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const getToken = React.useCallback(async (forceRefresh = false): Promise<string | null> => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      // Handle the "Refresh Token Not Found" error which can happen if the session is unrecoverable
+      if (error?.message?.includes('Refresh Token Not Found')) {
+        console.error('[Auth] Terminal session error, signing out:', error.message);
+        await signOut();
+        return null;
+      }
+
+      if (error || !session) {
+        if (error) console.error('[Auth] getSession error:', error.message);
+        return null;
+      }
+      
+      // Check if token is expired or expiring soon (within 60 seconds) or if refresh is forced
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = session.expires_at || 0;
+      const isExpiring = expiresAt - now < 60;
+      
+      if (isExpiring || forceRefresh) {
+        console.log(`[Auth] ${forceRefresh ? 'Forced refresh' : 'Token expiring'}, refreshing session...`);
+        const { data: { session: refreshed }, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError) {
+          console.error('[Auth] Token refresh failed:', refreshError.message);
+          
+          // Handle the "Refresh Token Not Found" error during manual refresh
+          if (refreshError.message.includes('Refresh Token Not Found')) {
+            console.log('[Auth] Refresh token missing during refresh call, signing out...');
+            await signOut();
+          }
+          
+          return null;
+        }
+        
+        return refreshed?.access_token || null;
+      }
+      
+      return session.access_token;
+    } catch (error: any) {
+      console.error('[Auth] Get token error:', error.message);
+      return null;
+    }
+  }, [signOut]);
 
   const updateProfile = async (data: { full_name?: string; email?: string }) => {
     try {

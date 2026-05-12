@@ -49,7 +49,7 @@ export const CabinetProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       // 2. Background Revalidation: Sync with API
-      const token = await getToken();
+      const token = await getToken(isRetry);
       if (token) {
         try {
           const response = await api.getCabinetItems(token);
@@ -61,8 +61,7 @@ export const CabinetProvider: React.FC<{ children: React.ReactNode }> = ({ child
           // If we get a 401 and we haven't retried yet, try refreshing the token and retrying
           if (apiError.status === 401 && !isRetry) {
             console.warn('[CabinetContext] 401 detected, attempting token refresh and retry...');
-            // getToken() already handles refresh if token is stale, 
-            // so just calling refreshCabinet(true) will trigger a fresh getToken call
+            // getToken(true) will be called in the retry to force a refresh
             return refreshCabinet(true);
           }
           throw apiError;

@@ -222,19 +222,27 @@ const HomeScreen: React.FC = () => {
 
       // Synchronize with server if authenticated
       if (user) {
-        getToken().then(token => {
+        const syncHistory = async (isRetry = false) => {
+          const token = await getToken(isRetry);
           if (token) {
-            console.log(`[History] Syncing search with server: ${queryToSave}`);
-            api.saveRecentSearch(queryToSave, token)
-              .then(updated => {
-                console.log(`[History] Server sync success, count: ${updated.length}`);
-                setRecentSearches(updated);
-                DeviceEventEmitter.emit('history_updated');
-              })
-              .catch(err => console.error('[History] Server sync failed:', err));
+            try {
+              console.log(`[History] Syncing search with server: ${queryToSave} (retry=${isRetry})`);
+              const updated = await api.saveRecentSearch(queryToSave, token);
+              console.log(`[History] Server sync success, count: ${updated.length}`);
+              setRecentSearches(updated);
+              DeviceEventEmitter.emit('history_updated');
+            } catch (err: any) {
+              if (err.status === 401 && !isRetry) {
+                console.warn('[History] 401 detected during sync, retrying with fresh token...');
+                return syncHistory(true);
+              }
+              console.error('[History] Server sync failed:', err);
+            }
           }
-        });
+        };
+        syncHistory();
       }
+
 
     } catch (error: any) {
       if (error.name === 'AbortError') return;
