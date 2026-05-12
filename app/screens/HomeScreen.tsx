@@ -22,6 +22,8 @@ import * as api from '../services/api';
 import { LocalStorageService } from '../services/storage';
 import RecentSearches from '../components/RecentSearches';
 import { useCabinet } from '../context/CabinetContext';
+import { supabase } from '../services/supabase';
+
 
 type AppState = 'empty' | 'loading' | 'success' | 'partial' | 'notFound' | 'error';
 
@@ -105,10 +107,29 @@ const HomeScreen: React.FC = () => {
     setEli12Result(null);
     searchStartTime.current = performance.now();
 
+    // 2. Drug Resolution Layer: Check Supabase mapping first
+    let finalSearchTerm = searchQuery.trim();
     try {
-      // 2. Memory Cache Check (Instant)
-      if (sessionCache.current.has(cleanQuery)) {
-        const cached = sessionCache.current.get(cleanQuery)!;
+      const { data: mapping } = await supabase
+        .from('drug_mappings')
+        .select('mapped_name')
+        .ilike('local_name', cleanQuery)
+        .single();
+
+      if (mapping?.mapped_name) {
+        console.log(`[Search] Mapped query: "${cleanQuery}" -> "${mapping.mapped_name}"`);
+        finalSearchTerm = mapping.mapped_name;
+      }
+    } catch (e) {
+      // Ignore mapping errors, fallback to original query
+    }
+
+    try {
+      // 3. Memory Cache Check (Instant) using the resolved term
+      const cacheKey = finalSearchTerm.toLowerCase();
+      if (sessionCache.current.has(cacheKey)) {
+        const cached = sessionCache.current.get(cacheKey)!;
+
         setBaseResult(cached);
 
         if (cached.eli12?.enabled && cached.eli12.content) {
@@ -117,14 +138,14 @@ const HomeScreen: React.FC = () => {
         }
 
         setState('success');
-        console.log(`[Perf] Memory cache hit for: ${cleanQuery}`);
+        console.log(`[Perf] Memory cache hit for: ${cacheKey}`);
         return;
       }
 
-      // 3. Disk Cache Check
-      const diskCached = await LocalStorageService.getCachedResult(cleanQuery);
+      // 4. Disk Cache Check
+      const diskCached = await LocalStorageService.getCachedResult(cacheKey);
       if (diskCached) {
-        sessionCache.current.set(cleanQuery, diskCached);
+        sessionCache.current.set(cacheKey, diskCached);
         setBaseResult(diskCached);
 
         if (diskCached.eli12?.enabled && diskCached.eli12.content) {
@@ -135,11 +156,11 @@ const HomeScreen: React.FC = () => {
         }
 
         setState('success');
-        console.log(`[Perf] Disk cache hit for: ${cleanQuery}`);
+        console.log(`[Perf] Disk cache hit for: ${cacheKey}`);
         return;
       }
 
-      // 4. API Fetch with Timeout handling
+      // 5. API Fetch with Timeout handling
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('TIMEOUT')), 60000) // Increased to 60s to allow deep AI response time
       );
@@ -148,7 +169,8 @@ const HomeScreen: React.FC = () => {
         setTimeout(() => resolve('SLOW'), 12000) // Show status after 12s
       );
 
-      const fetchPromise = api.searchMedication(searchQuery.trim(), false);
+      const fetchPromise = api.searchMedication(finalSearchTerm, false);
+
 
       // Use a more nuanced race to handle the slow status
       let response: api.SearchResponse;
@@ -164,10 +186,11 @@ const HomeScreen: React.FC = () => {
       }
 
       const duration = Math.round(performance.now() - searchStartTime.current);
-      console.log(`[Perf] API Search took ${duration}ms for: ${cleanQuery}`);
+      console.log(`[Perf] API Search took ${duration}ms for: ${cacheKey}`);
 
-      sessionCache.current.set(cleanQuery, response);
+      sessionCache.current.set(cacheKey, response);
       setBaseResult(response);
+
 
       // 5. If ELI12 was pre-generated, set it immediately
       if (response.eli12?.enabled && response.eli12.content) {
@@ -183,7 +206,8 @@ const HomeScreen: React.FC = () => {
       setState('success');
 
       // Async persistence
-      LocalStorageService.setCachedResult(cleanQuery, response);
+      LocalStorageService.setCachedResult(cacheKey, response);
+
 
       const queryToSave = searchQuery.trim();
       // Save to local storage for instant availability in the drawer
