@@ -39,8 +39,27 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     // Debug logging
     console.log(`[Auth] Validating token for ${req.url} (Key prefix: ${supabaseKey.substring(0, 10)}...)`);
 
-    // Validate the token specifically
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Validate the token specifically with a timeout to prevent hanging
+    console.log(`[Auth] Validating token for ${req.url}...`);
+    
+    const getUserWithTimeout = async () => {
+      const { data, error } = await supabase.auth.getUser(token);
+      return { data, error };
+    };
+
+    const timeoutPromise = new Promise<{ data: any, error: any }>((_, reject) => 
+      setTimeout(() => reject(new Error('Supabase Auth Timeout')), 8000)
+    );
+
+    let authResult;
+    try {
+      authResult = await Promise.race([getUserWithTimeout(), timeoutPromise]);
+    } catch (raceError: any) {
+      console.error(`[Auth] validation failed or timed out for ${req.url}:`, raceError.message);
+      return res.status(504).json({ error: 'Authentication timeout', message: 'The auth service took too long to respond. Please try again.' });
+    }
+
+    const { data: { user }, error } = authResult;
 
     if (error || !user) {
       console.error(`[Auth] Token validation failed for ${req.url}:`, error?.message || 'No user found');

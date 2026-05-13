@@ -1,7 +1,7 @@
 import { Config } from '../config';
 
 const MAX_RETRIES = 3;
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_TIMEOUT = 45000; // 45 seconds
 
 export interface SearchResponse {
   drug_name: string;

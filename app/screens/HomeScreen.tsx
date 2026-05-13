@@ -508,12 +508,16 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  const Container = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+  const containerProps = Platform.OS === 'ios' ? {
+    behavior: 'padding' as const,
+    style: styles.keyboardView
+  } : {
+    style: styles.keyboardView
+  };
+
   return (
-    <KeyboardAvoidingView
-      style={styles.keyboardView}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
-    >
+    <Container {...containerProps}>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         {/* Static Background Headline */}
         {state === 'empty' && (
@@ -583,7 +587,14 @@ const HomeScreen: React.FC = () => {
         </ScrollView>
 
         {/* Floating Bottom Bar */}
-        <View style={[styles.floatingFooter, { paddingBottom: isKeyboardVisible ? 20 : Math.max(insets.bottom + 20, 32) }]}>
+        <View style={[
+          styles.floatingFooter, 
+          { 
+            paddingBottom: isKeyboardVisible 
+              ? 12 
+              : Math.max(insets.bottom, 16) 
+          }
+        ]}>
           <InputBar
             ref={inputBarRef}
             onSubmit={handleSearch}
@@ -595,7 +606,7 @@ const HomeScreen: React.FC = () => {
         </View>
       </SafeAreaView>
 
-    </KeyboardAvoidingView>
+    </Container>
   );
 };
 

@@ -24,11 +24,21 @@ export const getCabinetItems = async (req: AuthenticatedRequest, res: Response) 
   try {
     const supabase = getUserScopedClient(req.userToken!);
 
-    const { data, error, status } = await supabase
+    console.log(`[Cabinet] Executing database query for ${req.userId}...`);
+    
+    const fetchPromise = supabase
       .from('cabinet_items')
       .select('*')
       .eq('user_id', req.userId)
       .order('created_at', { ascending: false });
+
+    const timeoutPromise = new Promise<any>((_, reject) => 
+      setTimeout(() => reject(new Error('Database Query Timeout')), 10000)
+    );
+
+    const { data, error, status } = await Promise.race([fetchPromise, timeoutPromise]);
+    
+    console.log(`[Cabinet] Database query finished for ${req.userId} (Status: ${status})`);
 
     if (error) {
       console.error(`[Cabinet] Fetch error (Status ${status}):`, error.message);

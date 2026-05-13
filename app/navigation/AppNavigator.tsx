@@ -299,17 +299,15 @@ const AppNavigator = () => {
 
 const styles = StyleSheet.create({
   drawerHeader: {
-    padding: 24,
-    paddingTop: 80,
-    paddingBottom: 16,
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 20,
   },
   logoWrapper: {
-    height: 48,
+    height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F0F4FF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    alignItems: 'flex-start',
+    backgroundColor: 'transparent',
   },
   userEmail: {
     fontSize: 12,
