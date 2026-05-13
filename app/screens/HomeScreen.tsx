@@ -372,7 +372,6 @@ const HomeScreen: React.FC = () => {
 
     try {
       setExportLoading(true);
-
       const uri = await PDFService.generateMedicationReport({
         drugName: baseResult.drug_name,
         source: baseResult.source,
@@ -508,105 +507,104 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const Container = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
-  const containerProps = Platform.OS === 'ios' ? {
-    behavior: 'padding' as const,
-    style: styles.keyboardView
-  } : {
-    style: styles.keyboardView
-  };
+  const content = (
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {/* Static Background Headline */}
+      {state === 'empty' && (
+        <View style={styles.staticHeadlineWrapper} pointerEvents="none">
+          <Text style={[styles.headlineText, { color: theme.colors.onSurfaceVariant }]}>
+            How can I help you with your medication today?
+          </Text>
+        </View>
+      )}
+
+      {/* Top Navigation */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.openDrawer()}>
+          <Ionicons name="menu-outline" size={28} color={theme.colors.onSurfaceVariant} />
+        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[styles.cabinetPill, { backgroundColor: theme.colors.primaryContainer, borderWidth: 0 }]}
+            onPress={() => {
+              if (isGuest) {
+                if (query) LocalStorageService.setPendingSearch(query, isELI12);
+                navigation.navigate('SignUp');
+              } else {
+                navigation.navigate('Cabinet');
+              }
+            }}
+          >
+            <Ionicons name="briefcase" size={18} color={theme.colors.onPrimaryContainer} />
+            <Text style={[styles.cabinetText, { color: theme.colors.onPrimaryContainer }]}>Cabinet</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.profileCircle,
+              {
+                backgroundColor: user ? theme.colors.onSurfaceVariant : theme.colors.outlineVariant,
+                borderWidth: 0
+              }
+            ]}
+            onPress={() => navigation.navigate('Settings')}
+          >
+            {user ? (
+              <Text style={[styles.initialsText, { color: theme.colors.surface }]}>
+                {(() => {
+                  const name = user.user_metadata?.full_name;
+                  if (name) {
+                    const parts = name.trim().split(/\s+/);
+                    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                    return parts[0][0].toUpperCase();
+                  }
+                  return user.email?.[0].toUpperCase() || '?';
+                })()}
+              </Text>
+            ) : (
+              <Ionicons name="person" size={20} color={theme.colors.onSurfaceVariant} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {renderContent()}
+      </ScrollView>
+
+      {/* Floating Bottom Bar */}
+      <View style={[
+        styles.floatingFooter, 
+        { 
+          paddingBottom: isKeyboardVisible 
+            ? 2
+            : insets.bottom > 0 ? insets.bottom : 8
+        }
+      ]}>
+        <InputBar
+          ref={inputBarRef}
+          onSubmit={handleSearch}
+          loading={state === 'loading'}
+          fetchSuggestions={fetchSuggestions}
+          eli12Enabled={isELI12}
+          onToggleEli12={handleToggleELI12}
+        />
+      </View>
+    </SafeAreaView>
+  );
 
   return (
-    <Container {...containerProps}>
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        {/* Static Background Headline */}
-        {state === 'empty' && (
-          <View style={styles.staticHeadlineWrapper} pointerEvents="none">
-            <Text style={[styles.headlineText, { color: theme.colors.onSurfaceVariant }]}>
-              How can I help you with your medication today?
-            </Text>
-          </View>
-        )}
-
-        {/* Top Navigation */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.openDrawer()}>
-            <Ionicons name="menu-outline" size={28} color={theme.colors.onSurfaceVariant} />
-          </TouchableOpacity>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={[styles.cabinetPill, { backgroundColor: theme.colors.primaryContainer, borderWidth: 0 }]}
-              onPress={() => {
-                if (isGuest) {
-                  if (query) LocalStorageService.setPendingSearch(query, isELI12);
-                  navigation.navigate('SignUp');
-                } else {
-                  navigation.navigate('Cabinet');
-                }
-              }}
-            >
-              <Ionicons name="briefcase" size={18} color={theme.colors.onPrimaryContainer} />
-              <Text style={[styles.cabinetText, { color: theme.colors.onPrimaryContainer }]}>Cabinet</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.profileCircle,
-                {
-                  backgroundColor: user ? theme.colors.onSurfaceVariant : theme.colors.outlineVariant,
-                  borderWidth: 0
-                }
-              ]}
-              onPress={() => navigation.navigate('Settings')}
-            >
-              {user ? (
-                <Text style={[styles.initialsText, { color: theme.colors.surface }]}>
-                  {(() => {
-                    const name = user.user_metadata?.full_name;
-                    if (name) {
-                      const parts = name.trim().split(/\s+/);
-                      if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-                      return parts[0][0].toUpperCase();
-                    }
-                    return user.email?.[0].toUpperCase() || '?';
-                  })()}
-                </Text>
-              ) : (
-                <Ionicons name="person" size={20} color={theme.colors.onSurfaceVariant} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {renderContent()}
-        </ScrollView>
-
-        {/* Floating Bottom Bar */}
-        <View style={[
-          styles.floatingFooter, 
-          { 
-            paddingBottom: isKeyboardVisible 
-              ? 12 
-              : Math.max(insets.bottom, 16) 
-          }
-        ]}>
-          <InputBar
-            ref={inputBarRef}
-            onSubmit={handleSearch}
-            loading={state === 'loading'}
-            fetchSuggestions={fetchSuggestions}
-            eli12Enabled={isELI12}
-            onToggleEli12={handleToggleELI12}
-          />
-        </View>
-      </SafeAreaView>
-
-    </Container>
+    <KeyboardAvoidingView
+      style={styles.keyboardView}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
+      {content}
+    </KeyboardAvoidingView>
   );
 };
 
@@ -684,8 +682,8 @@ const makeStyles = (theme: ThemeContextType) => StyleSheet.create({
   },
   floatingFooter: {
     paddingHorizontal: 0,
-    paddingTop: 8,
-    backgroundColor: 'transparent',
+    paddingTop: 4,
+    backgroundColor: theme.colors.background,
     gap: 10,
   },
   headlineText: {
