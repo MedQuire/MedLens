@@ -304,12 +304,12 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   logoWrapper: {
-    height: 40,
+    height: 48,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     backgroundColor: '#F0F4FF',
     borderRadius: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
   },
   userEmail: {
     fontSize: 12,

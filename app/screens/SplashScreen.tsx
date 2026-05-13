@@ -101,7 +101,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         ]}
       >
         <View style={styles.logoWrapper}>
-          <SvgXml xml={LOGO_SVG} width={200} height={100} />
+          <SvgXml xml={LOGO_SVG} width={220} height={110} preserveAspectRatio="xMidYMid meet" />
         </View>
       </Animated.View>
 
@@ -125,13 +125,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoWrapper: {
-    height: 40,
+    height: 120,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     backgroundColor: '#F0F4FF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 20,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    marginBottom: 30,
   },
   footer: {
     position: 'absolute',
