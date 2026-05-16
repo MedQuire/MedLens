@@ -58,8 +58,7 @@
       "expo-font",
       "expo-asset",
       "expo-audio",
-      "expo-speech-recognition",
-      "expo-linking"
+      "expo-speech-recognition"
     ],
     "extra": {
       "eas": {
