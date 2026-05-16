@@ -254,17 +254,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('[GoogleAuth] Starting Google Auth...');
 
-      // Generate redirect URI using AuthSession (Expo Go compatible)
-      const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: 'medquire',
-      });
+      const redirectUrl = 'medquire://';
       console.log('[GoogleAuth] Redirect URL:', redirectUrl);
-      console.log('[GoogleAuth] Platform:', Platform.OS);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
         },
       });
 
@@ -273,55 +270,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { error };
       }
 
-      console.log('[GoogleAuth] OAuth URL received:', data?.url ? 'YES' : 'NO');
-
       if (data?.url) {
-        console.log('[GoogleAuth] Opening browser for Google Login...');
         const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
         console.log('[GoogleAuth] WebBrowser result type:', res.type);
 
         if (res.type === 'success' && res.url) {
-          console.log('[GoogleAuth] Success! Callback URL received:', res.url.substring(0, 80) + '...');
           const paramsStr = res.url.split('#')[1] || res.url.split('?')[1];
           if (paramsStr) {
             const searchParams = new URLSearchParams(paramsStr.replace(/\?/g, '&'));
             const access_token = searchParams.get('access_token');
             const refresh_token = searchParams.get('refresh_token');
 
-            console.log('[GoogleAuth] Tokens found:', {
-              access_token: access_token ? `${access_token.substring(0, 10)}...` : 'MISSING',
-              refresh_token: refresh_token ? `${refresh_token.substring(0, 10)}...` : 'MISSING',
-            });
-
             if (access_token && refresh_token) {
               const { error: sessionError } = await supabase.auth.setSession({
                 access_token,
                 refresh_token,
               });
-              if (sessionError) {
-                console.error('[GoogleAuth] Session setting error:', sessionError);
-                return { error: sessionError };
-              }
-              console.log('[GoogleAuth] Session established successfully!');
+              if (sessionError) return { error: sessionError };
               await LocalStorageService.setOnboardingCompleted();
               await LocalStorageService.setHasAuthenticatedBefore();
-              const { data: { user: googleUser } } = await supabase.auth.getUser(access_token);
-              if (googleUser) {
-                await syncGuestSearches(access_token);
-              }
             } else {
-              console.warn('[GoogleAuth] No tokens found in redirect URL params');
-              return { error: new Error('Authentication failed: no tokens received') };
+              return { error: new Error('No tokens received') };
             }
-          } else {
-            console.warn('[GoogleAuth] No params string found in callback URL');
-            return { error: new Error('Authentication failed: invalid redirect') };
           }
         } else if (res.type === 'cancel' || res.type === 'dismiss') {
-          console.log('[GoogleAuth] User cancelled the sign-in flow.');
           return { error: new Error('User cancelled sign-in') };
-        } else {
-          console.log('[GoogleAuth] Unexpected browser result:', JSON.stringify(res));
         }
       }
       return { error: null };
