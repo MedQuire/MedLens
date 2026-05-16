@@ -42,6 +42,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         // This allows session checks to complete in the background while the user sees the brand
         const startTime = Date.now();
 
+        // Wait for Supabase session to be established after OAuth redirect
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         const isAuthenticated = !!session?.user;
         const hasAuthenticatedBefore = await LocalStorageService.getHasAuthenticatedBefore();
         const onboardingCompleted = await LocalStorageService.getOnboardingCompleted();
