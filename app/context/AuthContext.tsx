@@ -254,7 +254,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('[GoogleAuth] Starting Google Auth...');
 
-      const redirectUrl = 'medquire://';
+      const redirectUrl = Linking.createURL('/');
       console.log('[GoogleAuth] Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
