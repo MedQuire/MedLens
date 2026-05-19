@@ -275,13 +275,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('[GoogleAuth] WebBrowser result type:', res.type);
 
         if (res.type === 'success' && res.url) {
-          console.log('[GoogleAuth] Full callback URL:', res.url); // ADD THIS
-          const paramsStr = res.url.split('#')[1] || res.url.split('?')[1];
-          console.log('[GoogleAuth] Params string:', paramsStr); // ADD THIS
+          console.log('[GoogleAuth] Full callback URL:', res.url);
+          
+          // Try both # and ? for token extraction
+          const hashParams = res.url.split('#')[1];
+          const queryParams = res.url.split('?')[1];
+          const paramsStr = hashParams || queryParams;
+          
+          console.log('[GoogleAuth] Hash params:', hashParams);
+          console.log('[GoogleAuth] Query params:', queryParams);
+          
           if (paramsStr) {
-            const searchParams = new URLSearchParams(paramsStr.replace(/\?/g, '&'));
+            const searchParams = new URLSearchParams(paramsStr);
             const access_token = searchParams.get('access_token');
             const refresh_token = searchParams.get('refresh_token');
+            
+            console.log('[GoogleAuth] access_token found:', !!access_token);
+            console.log('[GoogleAuth] refresh_token found:', !!refresh_token);
 
             if (access_token && refresh_token) {
               const { error: sessionError } = await supabase.auth.setSession({
