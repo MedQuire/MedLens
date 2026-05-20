@@ -1,0 +1,24 @@
+# Ignore dependencies and build outputs
+node_modules/
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# Ignore local config and cache
+.metro-health-check*
+*.tsbuildinfo
+.env*.local
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore diagnostic / debug files
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+*.bak
+qrcode.png
