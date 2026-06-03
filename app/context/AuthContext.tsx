@@ -278,14 +278,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         );
         if (res.type === 'success' && res.url) {
           console.log('[GoogleAuth] Callback URL:', res.url);
-          const { error: sessionError } = await supabase.auth.exchangeCodeForSession(res.url);
-          if (sessionError) {
-            console.error('[GoogleAuth] Session error:', sessionError);
-            return { error: sessionError };
+          const url = new URL(res.url);
+          const code = url.searchParams.get('code');
+          if (code) {
+            const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+            if (sessionError) {
+              console.error('[GoogleAuth] Session error:', sessionError);
+              return { error: sessionError };
+            }
+            await LocalStorageService.setOnboardingCompleted();
+            await LocalStorageService.setHasAuthenticatedBefore();
+            return { error: null };
           }
-          await LocalStorageService.setOnboardingCompleted();
-          await LocalStorageService.setHasAuthenticatedBefore();
-          return { error: null };
+          return { error: new Error('No code received') };
         } else if (res.type === 'cancel' || res.type === 'dismiss') {
           return { error: new Error('User cancelled sign-in') };
         }
