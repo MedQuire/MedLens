@@ -13,7 +13,10 @@ import { searchMedication, generateELI12, autocomplete, transcribeAudio, getRece
 import { getCabinetItems, saveCabinetItem, deleteCabinetItem } from './controllers/cabinet.controller';
 import { deleteAccount } from './controllers/auth.controller';
 import { handleSupportChat, getChatHistory, getSupportHistory, getConversationMessages, clearSupportHistory } from './controllers/support.controller';
+import { createSubscription, getCurrentSubscription, cancelSubscription } from './controllers/subscriptions.controller';
+import { handleFlutterwaveWebhook } from './controllers/webhooks.controller';
 import { requireAuth } from './middleware/auth.middleware';
+import { requirePremium } from './middleware/premium.middleware';
 import { rateLimiter } from './middleware/rate-limiter.middleware';
 import OpenFDAService from './services/openfda.service';
 import DeepSeekService from './services/deepseek.service';
@@ -70,6 +73,18 @@ app.post('/api/search/recent/sync', requireAuth, syncRecentSearches);
 app.get('/api/cabinet/items', requireAuth, getCabinetItems);
 app.post('/api/cabinet/save', requireAuth, saveCabinetItem);
 app.delete('/api/cabinet/items/:id', requireAuth, deleteCabinetItem);
+
+// ── Subscription Routes ─────────────────────────────────────────────────────
+app.post('/api/subscriptions/create', requireAuth, createSubscription);
+app.get('/api/subscriptions/current', requireAuth, getCurrentSubscription);
+app.post('/api/subscriptions/cancel', requireAuth, cancelSubscription);
+
+// ── Flutterwave Webhook (public, signature verified in handler) ─────────────
+app.post('/api/webhooks/flutterwave', handleFlutterwaveWebhook);
+
+// ── Premium-Gated Routes ───────────────────────────────────────────────────
+// Cabinet routes already use requireAuth; premium gates are enforced at the
+// controller level or by applying requirePremium as needed.
 
 // ── Auth Management ──────────────────────────────────────────────────────────
 app.delete('/api/auth/account', requireAuth, deleteAccount);
@@ -149,6 +164,10 @@ app.use((req, res) => {
       'GET /api/cabinet/items',
       'POST /api/cabinet/save',
       'POST /api/interactions',
+      'POST /api/subscriptions/create',
+      'GET /api/subscriptions/current',
+      'POST /api/subscriptions/cancel',
+      'POST /api/webhooks/flutterwave',
       'GET /health'
     ]
   });
