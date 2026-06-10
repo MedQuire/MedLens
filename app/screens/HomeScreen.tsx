@@ -17,6 +17,7 @@ import InputBar, { InputBarHandle } from '../components/InputBar';
 import EmptyState from '../components/EmptyState';
 import Disclaimer from '../components/Disclaimer';
 import TrustBadges from '../components/TrustBadges';
+import UpgradeModal from '../components/UpgradeModal';
 import { PDFService } from '../services/pdf';
 import * as api from '../services/api';
 import { LocalStorageService } from '../services/storage';
@@ -29,7 +30,7 @@ type AppState = 'empty' | 'loading' | 'success' | 'partial' | 'notFound' | 'erro
 
 const HomeScreen: React.FC = () => {
   const theme = useTheme();
-  const { user, isGuest, getToken } = useAuth();
+  const { user, isGuest, isPro, getToken } = useAuth();
   const navigation = (useNavigation as any)() as DrawerNavigationProp<DrawerParamList>;
   const route = useRoute() as { params?: { searchQuery?: string } };
   const insets = useSafeAreaInsets();
@@ -46,6 +47,7 @@ const HomeScreen: React.FC = () => {
   const [isELI12, setIsELI12] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
 
   // Performance and Cache Refs
   const sessionCache = useRef<Map<string, api.SearchResponse>>(new Map());
@@ -255,6 +257,14 @@ const HomeScreen: React.FC = () => {
         return;
       }
 
+      // Handle free plan limit
+      if (error.status === 403 && error.error === 'free_plan_limit') {
+        console.log(`[Search] Free plan limit hit: ${error.feature}`);
+        setUpgradeFeature(error.feature || 'search');
+        setState('empty');
+        return;
+      }
+
       console.error('Search error:', error);
       if (error.message === 'TIMEOUT') {
         Alert.alert(
@@ -348,8 +358,11 @@ const HomeScreen: React.FC = () => {
         const description = baseResult.summary.what_it_does || undefined;
         await addToCabinet(drugName, drugKey, description);
         console.log(`[Cabinet] Add successful for: ${drugName} with desc: ${description}`);
-      } catch (error) {
+      } catch (error: any) {
         console.error('[Cabinet] Save failed:', error);
+        if (error.status === 403 && error.error === 'free_plan_limit') {
+          setUpgradeFeature(error.feature || 'save');
+        }
       }
     })();
 
@@ -366,6 +379,10 @@ const HomeScreen: React.FC = () => {
       // Save context before auth transition
       LocalStorageService.setPendingSearch(query, isELI12, 'export');
       navigation.navigate('SignUp');
+      return;
+    }
+    if (!isPro) {
+      setUpgradeFeature('export');
       return;
     }
     const currentSummary = isELI12 && eli12Result ? eli12Result : baseResult.summary;
@@ -604,6 +621,12 @@ const HomeScreen: React.FC = () => {
       keyboardVerticalOffset={0}
     >
       {content}
+
+      <UpgradeModal
+        visible={upgradeFeature !== null}
+        feature={upgradeFeature || 'search'}
+        onClose={() => setUpgradeFeature(null)}
+      />
     </KeyboardAvoidingView>
   );
 };

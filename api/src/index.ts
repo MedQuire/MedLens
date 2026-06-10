@@ -18,6 +18,8 @@ import { handleFlutterwaveWebhook } from './controllers/webhooks.controller';
 import { requireAuth } from './middleware/auth.middleware';
 import { requirePremium } from './middleware/premium.middleware';
 import { rateLimiter } from './middleware/rate-limiter.middleware';
+import { checkUsageLimit, requireProForExport } from './middleware/usage-limits.middleware';
+import UsageLimitsService from './services/usage-limits.service';
 import OpenFDAService from './services/openfda.service';
 import DeepSeekService from './services/deepseek.service';
 
@@ -95,12 +97,43 @@ app.get('/api/support/history', requireAuth, getSupportHistory);
 app.get('/api/support/conversations/:conversationId/messages', requireAuth, getConversationMessages);
 app.delete('/api/support/history', requireAuth, clearSupportHistory);
 
+// ── Usage Status ────────────────────────────────────────────────────────────
+app.get('/api/usage/status', requireAuth, async (req: any, res) => {
+  try {
+    const isPremium = await UsageLimitsService.isPremium(req.userId);
+    const usage = isPremium
+      ? []
+      : await UsageLimitsService.getUsageCounts(req.userId);
+    res.json({ plan: isPremium ? 'premium' : 'free', usage });
+  } catch (error: any) {
+    console.error('[Usage] Status error:', error.message);
+    res.status(500).json({ error: 'Failed to get usage status' });
+  }
+});
+
 // ── Interaction Checker ──────────────────────────────────────────────────────
-app.post('/api/interactions', rateLimiter(60000, 20), async (req, res) => {
+app.post('/api/interactions', rateLimiter(60000, 20), async (req: any, res) => {
   const { drug_keys } = req.body;
 
   if (!drug_keys || !Array.isArray(drug_keys) || drug_keys.length < 2) {
     return res.status(400).json({ error: 'At least two drug names are required' });
+  }
+
+  // Check interaction limit for authenticated free users
+  if (req.userId) {
+    const isPremium = await UsageLimitsService.isPremium(req.userId);
+    if (!isPremium) {
+      const limitCheck = await UsageLimitsService.checkLimit(req.userId, 'interaction');
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          error: 'free_plan_limit',
+          message: `Free plan limit reached. You've used ${limitCheck.current_count}/${limitCheck.max_limit} interaction checks today. Upgrade to Pro for unlimited access.`,
+          feature: 'interaction',
+          current_count: limitCheck.current_count,
+          max_limit: limitCheck.max_limit,
+        });
+      }
+    }
   }
 
   // MedQuire currently supports pairwise check for simplicity
@@ -135,6 +168,16 @@ app.post('/api/interactions', rateLimiter(60000, 20), async (req, res) => {
     // Generate ELI12 version
     const eli12Summary = await DeepSeekService.simplifyInteraction(analysis.summary);
 
+    // Track interaction usage for free users
+    if (req.userId) {
+      const isPremium = await UsageLimitsService.isPremium(req.userId);
+      if (!isPremium) {
+        UsageLimitsService.incrementUsage(req.userId, 'interaction').catch((e: any) =>
+          console.warn('[Usage] Failed to track interaction:', e.message)
+        );
+      }
+    }
+
     res.json({
       status: analysis.severity, // 'safe', 'caution', 'risky', 'unknown'
       message: analysis.summary,
@@ -168,6 +211,7 @@ app.use((req, res) => {
       'GET /api/subscriptions/current',
       'POST /api/subscriptions/cancel',
       'POST /api/webhooks/flutterwave',
+      'GET /api/usage/status',
       'GET /health'
     ]
   });

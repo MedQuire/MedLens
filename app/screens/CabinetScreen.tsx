@@ -11,6 +11,7 @@ import { CabinetItem } from '../services/api';
 import { LocalStorageService } from '../services/storage';
 import EmptyState from '../components/EmptyState';
 import SummaryCard from '../components/SummaryCard';
+import UpgradeModal from '../components/UpgradeModal';
 import { PDFService } from '../services/pdf';
 import { useCabinet } from '../context/CabinetContext';
 
@@ -52,7 +53,7 @@ const getDrugDescription = (name: string): string => {
 
 const CabinetScreen: React.FC = () => {
   const theme = useTheme();
-  const { user, getToken } = useAuth();
+  const { user, isPro, getToken } = useAuth();
   const navigation = useNavigation() as any;
   const { items, loading: cabinetLoading, removeItem: removeFromCabinet, refreshCabinet, savedDrugNames } = useCabinet();
   const [loading, setLoading] = useState(false);
@@ -62,6 +63,7 @@ const CabinetScreen: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [viewingItem, setViewingItem] = useState<CabinetItem | null>(null);
   const [selectedDrugSummary, setSelectedDrugSummary] = useState<api.SearchResponse | null>(null);
+  const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -129,6 +131,10 @@ const CabinetScreen: React.FC = () => {
 
   const handleExport = useCallback(async () => {
     if (!selectedDrugSummary) return;
+    if (!isPro) {
+      setUpgradeFeature('export');
+      return;
+    }
     
     try { 
       setLoading(true);
@@ -408,6 +414,11 @@ const CabinetScreen: React.FC = () => {
         </View>
       </Modal>
 
+      <UpgradeModal
+        visible={upgradeFeature !== null}
+        feature={upgradeFeature || 'export'}
+        onClose={() => setUpgradeFeature(null)}
+      />
     </SafeAreaView>
   );
 };

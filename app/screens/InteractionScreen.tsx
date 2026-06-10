@@ -11,6 +11,7 @@ import * as api from '../services/api';
 import { useTheme, ThemeContextType } from '../theme/ThemeProvider';
 import { LocalStorageService } from '../services/storage';
 import InteractionSkeleton from '../components/InteractionSkeleton';
+import UpgradeModal from '../components/UpgradeModal';
 
 
 
@@ -31,6 +32,7 @@ const InteractionScreen: React.FC = () => {
   const [checking, setChecking] = useState(false);
   const [isELI12, setIsELI12] = useState(false);
   const [result, setResult] = useState<api.InteractionResponse | null>(null);
+  const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
 
   // Load cabinet items for selection
   useEffect(() => {
@@ -126,7 +128,11 @@ const InteractionScreen: React.FC = () => {
 
       // 3. Save to Cache
       await LocalStorageService.setCachedInteraction(selectedDrugs, response);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status === 403 && error.error === 'free_plan_limit') {
+        setUpgradeFeature(error.feature || 'interaction');
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('Interaction check failed:', message);
       Alert.alert('Error', 'Failed to check interactions. Please try again.');
@@ -193,6 +199,7 @@ const InteractionScreen: React.FC = () => {
   }
 
   return (
+    <>
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -383,6 +390,12 @@ const InteractionScreen: React.FC = () => {
       </View>
     )}
     </ScrollView>
+      <UpgradeModal
+        visible={upgradeFeature !== null}
+        feature={upgradeFeature || 'interaction'}
+        onClose={() => setUpgradeFeature(null)}
+      />
+    </>
   );
 };
 

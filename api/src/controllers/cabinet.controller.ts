@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import UsageLimitsService from '../services/usage-limits.service';
 
 // Creates a Supabase client scoped to the authenticated user's JWT
 // This ensures RLS policies apply correctly — the user can only see their own data
@@ -68,6 +69,21 @@ export const saveCabinetItem = async (req: AuthenticatedRequest, res: Response) 
 
   if (!drug_name || !drug_key) {
     return res.status(400).json({ error: 'drug_name and drug_key are required' });
+  }
+
+  // Check save limit for free users
+  const isPremium = await UsageLimitsService.isPremium(req.userId!);
+  if (!isPremium) {
+    const limitCheck = await UsageLimitsService.checkLimit(req.userId!, 'save');
+    if (!limitCheck.allowed) {
+      return res.status(403).json({
+        error: 'free_plan_limit',
+        message: `Free plan limit reached. You can save up to ${limitCheck.max_limit} medications. Upgrade to Pro for unlimited storage.`,
+        feature: 'save',
+        current_count: limitCheck.current_count,
+        max_limit: limitCheck.max_limit,
+      });
+    }
   }
 
   try {
@@ -154,6 +170,14 @@ export const saveCabinetItem = async (req: AuthenticatedRequest, res: Response) 
     }
 
     console.log(`[Cabinet] Successfully saved ${drug_name} for ${req.userId}`);
+
+    // Track save count for free users
+    if (!isPremium) {
+      UsageLimitsService.incrementUsage(req.userId!, 'save').catch((e: any) =>
+        console.warn('[Usage] Failed to track save:', e.message)
+      );
+    }
+
     return res.json({ success: true, item: data });
   } catch (error: any) {
     console.error('[Cabinet] saveCabinetItem error:', error.message);

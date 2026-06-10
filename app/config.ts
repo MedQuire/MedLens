@@ -61,6 +61,7 @@ export const Config = {
       CURRENT: `${API_BASE_URL}/api/subscriptions/current`,
       CANCEL: `${API_BASE_URL}/api/subscriptions/cancel`,
     },
+    USAGE_STATUS: `${API_BASE_URL}/api/usage/status`,
   },
   SUPABASE: {
     URL: process.env.EXPO_PUBLIC_SUPABASE_URL || '',

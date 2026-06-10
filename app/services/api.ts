@@ -354,3 +354,24 @@ export async function cancelSubscriptionRequest(token: string): Promise<CancelSu
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+// ── Usage Tracking API ─────────────────────────────────────────────────────
+
+export interface UsageStatusItem {
+  feature: string;
+  count: number;
+  limit: number;
+  resets_at: string | null;
+}
+
+export interface UsageStatusResponse {
+  plan: 'free' | 'premium';
+  usage: UsageStatusItem[];
+}
+
+export async function getUsageStatus(token: string): Promise<UsageStatusResponse> {
+  return apiRequest<UsageStatusResponse>(Config.ENDPOINTS.USAGE_STATUS, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}

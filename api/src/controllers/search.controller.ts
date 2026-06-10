@@ -4,9 +4,32 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import openFDAService from '../services/openfda.service';
 import deepseekService, { AISummary } from '../services/deepseek.service';
 import geminiService from '../services/gemini.service';
+import UsageLimitsService from '../services/usage-limits.service';
 
 // In-memory cache for medication summaries
 const searchCache = new Map<string, any>();
+
+// Extract userId from auth header without blocking unauthenticated users
+const supabaseClient = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_ANON_KEY || '',
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
+
+async function extractUserId(req: Request): Promise<string | null> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !process.env.SUPABASE_URL) return null;
+  try {
+    const token = authHeader.split(' ')[1];
+    if (!token) return null;
+    const { data: { user } } = await supabaseClient.auth.getUser(token);
+    return user?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+const FREE_SEARCH_LIMIT = 5;
 
 export const searchMedication = async (req: Request, res: Response) => {
   const { query, eli12 } = req.body;
@@ -17,6 +40,24 @@ export const searchMedication = async (req: Request, res: Response) => {
 
   if (query.trim().length > 100) {
     return res.status(400).json({ error: 'Search query exceeds the maximum allowed length (100 characters)' });
+  }
+
+  // Check usage limit for authenticated free users
+  const userId = await extractUserId(req);
+  if (userId) {
+    const isPremium = await UsageLimitsService.isPremium(userId);
+    if (!isPremium) {
+      const limitCheck = await UsageLimitsService.checkLimit(userId, 'search');
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          error: 'free_plan_limit',
+          message: `Free plan limit reached. You've used ${limitCheck.current_count}/${FREE_SEARCH_LIMIT} searches today. Upgrade to Pro for unlimited access.`,
+          feature: 'search',
+          current_count: limitCheck.current_count,
+          max_limit: limitCheck.max_limit,
+        });
+      }
+    }
   }
 
   try {
@@ -111,6 +152,16 @@ export const searchMedication = async (req: Request, res: Response) => {
 
     // Save to cache
     searchCache.set(cacheKey, response);
+
+    // Track usage for authenticated free users (fire-and-forget)
+    if (userId) {
+      const isPremium = await UsageLimitsService.isPremium(userId);
+      if (!isPremium) {
+        UsageLimitsService.incrementUsage(userId, 'search').catch((e: any) =>
+          console.warn('[Usage] Failed to track search:', e.message)
+        );
+      }
+    }
     
     return res.json(response);
 
