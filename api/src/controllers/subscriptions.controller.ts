@@ -39,12 +39,15 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
       .maybeSingle();
 
     if (existing) {
-      return res.status(409).json({
-        error: 'Active subscription exists',
-        message: existing.status === 'ACTIVE'
-          ? 'You already have an active Premium subscription.'
-          : 'A subscription is already being processed. Please complete the pending payment.',
-      });
+      if (existing.status === 'ACTIVE') {
+        return res.status(409).json({
+          error: 'Active subscription exists',
+          message: 'You already have an active Premium subscription.',
+        });
+      }
+
+      // PENDING subscription from a previous incomplete payment — clean it up
+      await supabase.from('subscriptions').delete().eq('id', existing.id);
     }
 
     // Generate unique tx_ref
