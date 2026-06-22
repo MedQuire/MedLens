@@ -63,15 +63,23 @@ async function processChargeSuccess(payload: any, res: Response) {
     return res.status(200).json({ status: 'ignored', reason: 'subscription_not_found' });
   }
 
-  // Validate amount and currency (Paystack amounts are in cents)
-  const expectedAmount = subscription.plan === 'PREMIUM_MONTHLY' ? 999 : 8999;
+  // Validate amount and currency (Paystack amounts are in smallest unit: kobo/cents)
+  const SUPPORTED_CURRENCIES = ['NGN', 'USD'];
+  const expectedAmounts: Record<string, Record<string, number>> = {
+    PREMIUM_MONTHLY: { NGN: 150000, USD: 999 },
+    PREMIUM_YEARLY: { NGN: 1350000, USD: 8999 },
+  };
+
+  const currency = verification.data.currency;
+  const expectedAmount = expectedAmounts[subscription.plan]?.[currency];
   if (
-    Number(verification.data.amount) !== expectedAmount ||
-    verification.data.currency !== 'USD'
+    !SUPPORTED_CURRENCIES.includes(currency) ||
+    !expectedAmount ||
+    Number(verification.data.amount) !== expectedAmount
   ) {
     console.warn('[Webhook] Amount/currency mismatch:', {
-      expected: `${expectedAmount} USD`,
-      actual: `${verification.data.amount} ${verification.data.currency}`,
+      expected: `${expectedAmount} ${currency}`,
+      actual: `${verification.data.amount} ${currency}`,
     });
     return res.status(200).json({ status: 'ignored', reason: 'amount_mismatch' });
   }
