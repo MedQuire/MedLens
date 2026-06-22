@@ -204,7 +204,7 @@ const UpgradeScreen: React.FC = () => {
         </TouchableOpacity>
 
         <Text style={[styles.disclaimer, { color: theme.colors.onSurfaceVariant }]}>
-          Payment is processed securely by Flutterwave. Your card details never reach MedQuire.
+          Payment is processed securely by Paystack. Your card details never reach MedQuire.
         </Text>
       </ScrollView>
     </SafeAreaView>

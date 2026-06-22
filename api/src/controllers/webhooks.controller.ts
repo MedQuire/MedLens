@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import FlutterwaveService from '../services/flutterwave.service';
+import PaystackService from '../services/paystack.service';
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -16,58 +16,55 @@ const PERIOD_DAYS: Record<string, number> = {
   PREMIUM_YEARLY: 365,
 };
 
-async function processChargeCompleted(payload: any, res: Response) {
+async function processChargeSuccess(payload: any, res: Response) {
   const supabase = getSupabase();
-  const txRef = payload.data?.tx_ref;
-  const transactionId = payload.data?.id;
+  const reference = payload.data?.reference;
 
-  // 1. Check required fields
-  if (!txRef || !transactionId) {
-    console.warn('[Webhook] Missing tx_ref or transaction id');
-    return res.status(200).json({ status: 'ignored', reason: 'missing_fields' });
+  if (!reference) {
+    console.warn('[Webhook] Missing reference');
+    return res.status(200).json({ status: 'ignored', reason: 'missing_reference' });
   }
 
-  // 2. Check idempotency (gateway_reference already exists?)
+  // Idempotency check
   const { data: existingPayment } = await supabase
     .from('payments')
     .select('id')
-    .eq('gateway_reference', String(transactionId))
+    .eq('gateway_reference', reference)
     .maybeSingle();
 
   if (existingPayment) {
-    console.log('[Webhook] Duplicate webhook — already processed:', transactionId);
+    console.log('[Webhook] Duplicate webhook — already processed:', reference);
     return res.status(200).json({ status: 'duplicate' });
   }
 
-  // 3. Verify transaction with Flutterwave
+  // Verify transaction with Paystack
   let verification;
   try {
-    verification = await FlutterwaveService.verifyTransaction(transactionId);
+    verification = await PaystackService.verifyTransaction(reference);
   } catch (error: any) {
     console.error('[Webhook] Transaction verification failed:', error.message);
     return res.status(500).json({ error: 'Verification failed' });
   }
 
-  // 4. Validate verification result
-  if (verification.status !== 'success' || verification.data?.status !== 'successful') {
+  if (!verification.status || verification.data?.status !== 'success') {
     console.warn('[Webhook] Transaction not successful:', verification.data?.status);
     return res.status(200).json({ status: 'ignored', reason: 'transaction_not_successful' });
   }
 
-  // 5. Lookup subscription by tx_ref
+  // Lookup subscription by tx_ref (reference)
   const { data: subscription } = await supabase
     .from('subscriptions')
     .select('*')
-    .eq('tx_ref', verification.data.tx_ref)
+    .eq('tx_ref', reference)
     .maybeSingle();
 
   if (!subscription) {
-    console.warn('[Webhook] Subscription not found for tx_ref:', verification.data.tx_ref);
+    console.warn('[Webhook] Subscription not found for reference:', reference);
     return res.status(200).json({ status: 'ignored', reason: 'subscription_not_found' });
   }
 
-  // 6. Validate amount and currency match
-  const expectedAmount = subscription.plan === 'PREMIUM_MONTHLY' ? 9.99 : 89.99;
+  // Validate amount and currency (Paystack amounts are in cents)
+  const expectedAmount = subscription.plan === 'PREMIUM_MONTHLY' ? 999 : 8999;
   if (
     Number(verification.data.amount) !== expectedAmount ||
     verification.data.currency !== 'USD'
@@ -79,20 +76,19 @@ async function processChargeCompleted(payload: any, res: Response) {
     return res.status(200).json({ status: 'ignored', reason: 'amount_mismatch' });
   }
 
-  // 7. Determine if this is a first payment or renewal
+  // Determine if this is a first payment or renewal
   const isFirstPayment = subscription.status === 'PENDING';
   const now = new Date();
   const periodEnd = new Date(now);
   periodEnd.setDate(periodEnd.getDate() + (PERIOD_DAYS[subscription.plan] || 30));
 
   if (isFirstPayment) {
-    // First-time activation
     const { error: rpcError } = await supabase.rpc('process_subscription_payment', {
       p_user_id: subscription.user_id,
       p_subscription_id: subscription.id,
-      p_amount: Number(verification.data.amount),
+      p_amount: Number(verification.data.amount) / 100,
       p_currency: verification.data.currency,
-      p_gateway_reference: String(transactionId),
+      p_gateway_reference: reference,
       p_current_period_start: now.toISOString(),
       p_current_period_end: periodEnd.toISOString(),
     });
@@ -102,24 +98,22 @@ async function processChargeCompleted(payload: any, res: Response) {
       return res.status(500).json({ error: 'Database error' });
     }
 
-    // Update flutterwave customer ID on subscription
-    // Note: flutterwave_subscription_id is set by Flutterwave's subscription.cancelled / subscription.payment events,
-    // not from charge.completed (which only contains a transaction ID)
-    await supabase
-      .from('subscriptions')
-      .update({
-        flutterwave_customer_id: verification.data.customer?.id ? String(verification.data.customer.id) : null,
-      })
-      .eq('id', subscription.id);
+    // Store Paystack customer code on subscription
+    const customerCode = verification.data.customer?.customer_code;
+    if (customerCode) {
+      await supabase
+        .from('subscriptions')
+        .update({ paystack_customer_code: customerCode })
+        .eq('id', subscription.id);
+    }
 
     console.log('[Webhook] Subscription activated:', subscription.id);
   } else {
-    // Renewal
     const { error: rpcError } = await supabase.rpc('process_subscription_renewal', {
       p_subscription_id: subscription.id,
-      p_amount: Number(verification.data.amount),
+      p_amount: Number(verification.data.amount) / 100,
       p_currency: verification.data.currency,
-      p_gateway_reference: String(transactionId),
+      p_gateway_reference: reference,
       p_current_period_start: now.toISOString(),
       p_current_period_end: periodEnd.toISOString(),
     });
@@ -135,11 +129,12 @@ async function processChargeCompleted(payload: any, res: Response) {
   return res.status(200).json({ status: 'success' });
 }
 
-export async function handleFlutterwaveWebhook(req: Request, res: Response) {
+export async function handlePaystackWebhook(req: Request, res: Response) {
   try {
-    // 1. Verify webhook signature
-    const signature = req.headers['verif-hash'] as string | undefined;
-    if (!FlutterwaveService.verifyWebhookSignature(signature)) {
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const signature = req.headers['x-paystack-signature'] as string | undefined;
+
+    if (!PaystackService.verifyWebhookSignature(signature, rawBody)) {
       console.warn('[Webhook] Invalid signature');
       return res.status(401).json({ error: 'Invalid signature' });
     }
@@ -149,52 +144,23 @@ export async function handleFlutterwaveWebhook(req: Request, res: Response) {
 
     console.log(`[Webhook] Received event: ${event}`);
 
-    // 2. Route based on event type
     switch (event) {
-      case 'charge.completed':
-      case 'subscriptization.completed':
-        await processChargeCompleted(payload, res);
+      case 'charge.success':
+        await processChargeSuccess(payload, res);
         break;
 
-      case 'subscription.payment':
-        // Renewal payment
-        await processChargeCompleted(payload, res);
-        break;
-
-      case 'subscription.failed':
-        // Mark as PAST_DUE
+      case 'subscription.disable':
         const supabase = getSupabase();
-        const txRef = payload.data?.tx_ref;
-        if (txRef) {
+        const subCode = payload.data?.subscription_code;
+        if (subCode) {
           const { data: sub } = await supabase
             .from('subscriptions')
             .select('id')
-            .eq('tx_ref', txRef)
+            .eq('paystack_subscription_code', subCode)
             .maybeSingle();
 
           if (sub) {
-            await supabase.rpc('mark_subscription_past_due', {
-              p_subscription_id: sub.id,
-              p_gateway_reference: String(payload.data?.id || `${txRef}_failed`),
-            });
-            console.log('[Webhook] Subscription marked PAST_DUE:', sub.id);
-          }
-        }
-        return res.status(200).json({ status: 'past_due' });
-
-      case 'subscription.cancelled':
-        // Mark as CANCELLED
-        const supabase2 = getSupabase();
-        const fwSubId = payload.data?.id;
-        if (fwSubId) {
-          const { data: sub } = await supabase2
-            .from('subscriptions')
-            .select('id')
-            .eq('flutterwave_subscription_id', String(fwSubId))
-            .maybeSingle();
-
-          if (sub) {
-            await supabase2.rpc('cancel_subscription', {
+            await supabase.rpc('cancel_subscription', {
               p_subscription_id: sub.id,
             });
             console.log('[Webhook] Subscription cancelled:', sub.id);

@@ -1,8 +1,7 @@
 import { Response } from 'express';
-import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import FlutterwaveService from '../services/flutterwave.service';
+import PaystackService from '../services/paystack.service';
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -16,6 +15,11 @@ function getSupabase() {
 const SUBSCRIPTION_PRICES: Record<string, number> = {
   PREMIUM_MONTHLY: 9.99,
   PREMIUM_YEARLY: 89.99,
+};
+
+const SUBSCRIPTION_PLANS: Record<string, string | undefined> = {
+  PREMIUM_MONTHLY: process.env.PAYSTACK_PLAN_MONTHLY,
+  PREMIUM_YEARLY: process.env.PAYSTACK_PLAN_YEARLY,
 };
 
 export async function createSubscription(req: AuthenticatedRequest, res: Response) {
@@ -50,8 +54,8 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
       await supabase.from('subscriptions').delete().eq('id', existing.id);
     }
 
-    // Generate unique tx_ref
-    const txRef = `medquire_sub_${userId}_${Date.now()}`;
+    // Generate unique reference
+    const reference = `medquire_sub_${userId}_${Date.now()}`;
 
     // Get user email from public.users
     const { data: user } = await supabase
@@ -61,7 +65,7 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
       .single();
 
     const amount = SUBSCRIPTION_PRICES[plan];
-    const amountInCents = amount; // Flutterwave uses float amounts (already correct)
+    const amountInCents = Math.round(amount * 100);
 
     // Create pending subscription record
     const { data: subscription, error: insertError } = await supabase
@@ -70,7 +74,7 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
         user_id: userId,
         plan,
         status: 'PENDING',
-        tx_ref: txRef,
+        tx_ref: reference,
       })
       .select()
       .single();
@@ -80,36 +84,36 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
       return res.status(500).json({ error: 'Failed to initiate subscription' });
     }
 
-    // Call Flutterwave to create checkout
+    // Call Paystack to initialize transaction
     try {
-      const flutterwaveResponse = await FlutterwaveService.createSubscription({
-        tx_ref: txRef,
-        amount: amount,
+      const paystackPayload: any = {
+        email: user?.email || 'user@medquire.app',
+        amount: amountInCents,
         currency: 'USD',
-        redirect_url: process.env.FLUTTERWAVE_REDIRECT_URL || 'https://medquire.app/payment-success',
-        customer: {
-          email: user?.email || 'user@medquire.app',
-          name: 'MedQuire User',
-        },
-        customizations: {
-          title: 'MedQuire Premium',
-          description: plan === 'PREMIUM_MONTHLY' ? 'Monthly Premium Subscription' : 'Yearly Premium Subscription',
-        },
-        meta: {
+        reference,
+        callback_url: process.env.PAYSTACK_REDIRECT_URL || 'https://medquire.app/payment-success',
+        metadata: {
           user_id: userId,
           plan,
         },
-      });
+      };
+
+      const planCode = SUBSCRIPTION_PLANS[plan];
+      if (planCode) {
+        paystackPayload.plan = planCode;
+      }
+
+      const paystackResponse = await PaystackService.initializeTransaction(paystackPayload);
 
       return res.json({
-        checkout_url: flutterwaveResponse.data.link,
+        checkout_url: paystackResponse.data.authorization_url,
         subscription_id: subscription.id,
-        tx_ref: txRef,
+        tx_ref: reference,
       });
-    } catch (flutterwaveError: any) {
-      // Clean up pending subscription if Flutterwave call fails
+    } catch (paystackError: any) {
+      // Clean up pending subscription if Paystack call fails
       await supabase.from('subscriptions').delete().eq('id', subscription.id);
-      console.error('[Subscriptions] Flutterwave error:', flutterwaveError?.response?.data || flutterwaveError.message);
+      console.error('[Subscriptions] Paystack error:', paystackError?.response?.data || paystackError.message);
       return res.status(502).json({
         error: 'Payment gateway error',
         message: 'Failed to initiate payment. Please try again later.',
@@ -188,21 +192,13 @@ export async function cancelSubscription(req: AuthenticatedRequest, res: Respons
       return res.status(404).json({ error: 'No active subscription found' });
     }
 
-      // Cancel via Flutterwave if we have a subscription ID
-    if (subscription.flutterwave_subscription_id) {
+    // Cancel via Paystack if we have a subscription code
+    if (subscription.paystack_subscription_code) {
       try {
-        await axios.post(
-          `https://api.flutterwave.com/v3/subscriptions/${subscription.flutterwave_subscription_id}/cancel`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
-            },
-          }
-        );
-      } catch (fwError: any) {
-        console.warn('[Subscriptions] Flutterwave cancel warning:', fwError?.response?.data || fwError.message);
-        // Continue with local cancellation even if Flutterwave call fails
+        await PaystackService.disableSubscription(subscription.paystack_subscription_code);
+      } catch (psError: any) {
+        console.warn('[Subscriptions] Paystack cancel warning:', psError?.response?.data || psError.message);
+        // Continue with local cancellation even if Paystack call fails
       }
     }
 

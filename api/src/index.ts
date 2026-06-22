@@ -14,7 +14,7 @@ import { getCabinetItems, saveCabinetItem, deleteCabinetItem } from './controlle
 import { deleteAccount } from './controllers/auth.controller';
 import { handleSupportChat, getChatHistory, getSupportHistory, getConversationMessages, clearSupportHistory } from './controllers/support.controller';
 import { createSubscription, getCurrentSubscription, cancelSubscription } from './controllers/subscriptions.controller';
-import { handleFlutterwaveWebhook } from './controllers/webhooks.controller';
+import { handlePaystackWebhook } from './controllers/webhooks.controller';
 import { requireAuth } from './middleware/auth.middleware';
 import { requirePremium } from './middleware/premium.middleware';
 import { rateLimiter } from './middleware/rate-limiter.middleware';
@@ -28,6 +28,16 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
+
+// Capture raw body for webhook signature verification (needed before JSON parsing)
+app.use((req, res, next) => {
+  (req as any).rawBody = '';
+  req.on('data', (chunk: Buffer) => {
+    (req as any).rawBody += chunk.toString('utf8');
+  });
+  req.on('end', next);
+});
+
 app.use(express.json({ limit: '50mb' }));
 
 // Global Request Logger
@@ -81,8 +91,9 @@ app.post('/api/subscriptions/create', requireAuth, createSubscription);
 app.get('/api/subscriptions/current', requireAuth, getCurrentSubscription);
 app.post('/api/subscriptions/cancel', requireAuth, cancelSubscription);
 
-// ── Flutterwave Webhook (public, signature verified in handler) ─────────────
-app.post('/api/webhooks/flutterwave', handleFlutterwaveWebhook);
+// ── Paystack Webhook (public, signature verified in handler) ─────────────
+app.post('/api/webhooks/paystack', handlePaystackWebhook);
+app.post('/api/webhooks/flutterwave', (req, res) => res.status(410).json({ error: 'Gone', message: 'Migrated to Paystack. Use POST /api/webhooks/paystack.' }));
 
 // ── Premium-Gated Routes ───────────────────────────────────────────────────
 // Cabinet routes already use requireAuth; premium gates are enforced at the
@@ -210,7 +221,7 @@ app.use((req, res) => {
       'POST /api/subscriptions/create',
       'GET /api/subscriptions/current',
       'POST /api/subscriptions/cancel',
-      'POST /api/webhooks/flutterwave',
+      'POST /api/webhooks/paystack',
       'GET /api/usage/status',
       'GET /health'
     ]
