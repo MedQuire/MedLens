@@ -108,14 +108,15 @@ while ($null -eq $backendUrl -and $counter -lt $maxWait) {
 if ($null -eq $backendUrl) { Write-Host "Error: Could not retrieve Backend URL." -ForegroundColor Red; exit 1 }
 Write-Host "Backend Tunnel: $backendUrl" -ForegroundColor Green
 
-# 4. Sync .env
-Write-Host "`n[Syncing .env]..." -ForegroundColor Gray
-if (Test-Path ".env") {
-    $envContent = Get-Content ".env"
-    $newEnvContent = $envContent -replace "EXPO_PUBLIC_API_BASE_URL=.*", "EXPO_PUBLIC_API_BASE_URL=$backendUrl"
-    $newEnvContent | Set-Content ".env" -Encoding Utf8
-    Write-Host "Successfully synced .env!" -ForegroundColor Green
-}
+# 4. Sync .env — DISABLED: tunnel URL would overwrite production Railway URL
+# Write-Host "`n[Syncing .env]..." -ForegroundColor Gray
+# if (Test-Path ".env") {
+#     $envContent = Get-Content ".env"
+#     $newEnvContent = $envContent -replace "EXPO_PUBLIC_API_BASE_URL=.*", "EXPO_PUBLIC_API_BASE_URL=$backendUrl"
+#     $newEnvContent | Set-Content ".env" -Encoding Utf8
+#     Write-Host "Successfully synced .env!" -ForegroundColor Green
+# }
+Write-Host "[Skipped .env sync — keeping EXPO_PUBLIC_API_BASE_URL unchanged]" -ForegroundColor Yellow
 
 # 5. Handle Frontend Tunnel (Port 8081)
 Write-Host "`n[3/4] Starting Fresh Frontend Tunnel (Cloudflare)..." -ForegroundColor Cyan

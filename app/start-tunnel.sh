@@ -42,8 +42,10 @@ for i in $(seq 1 30); do
 done
 
 if [ ! -z "$BACKEND_URL" ]; then
-    echo "Updating .env with Backend URL: $BACKEND_URL"
-    sed -i '' "s|EXPO_PUBLIC_API_BASE_URL=.*|EXPO_PUBLIC_API_BASE_URL=$BACKEND_URL|g" .env
+    # DISABLED: tunnel URL would overwrite production Railway URL
+    # echo "Updating .env with Backend URL: $BACKEND_URL"
+    # sed -i '' "s|EXPO_PUBLIC_API_BASE_URL=.*|EXPO_PUBLIC_API_BASE_URL=$BACKEND_URL|g" .env
+    echo "Skipped .env sync — keeping EXPO_PUBLIC_API_BASE_URL unchanged"
 else
     echo "ERROR: Failed to get Backend URL"
 fi
