@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Linking,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { useAuth } from '../context/AuthContext';
@@ -16,19 +16,26 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as api from '../services/api';
 
+const PRICES: Record<string, Record<string, { price: string, raw: number }>> = {
+  PREMIUM_MONTHLY: {
+    USD: { price: '$9.99', raw: 9.99 },
+    NGN: { price: '₦1,500', raw: 1500 },
+  },
+  PREMIUM_YEARLY: {
+    USD: { price: '$89.99', raw: 89.99 },
+    NGN: { price: '₦13,500', raw: 13500 },
+  },
+};
+
 const PLANS = [
   {
     id: 'PREMIUM_MONTHLY' as const,
     name: 'Monthly',
-    price: '$9.99',
-    period: '/month',
     badge: null,
   },
   {
     id: 'PREMIUM_YEARLY' as const,
     name: 'Yearly',
-    price: '$89.99',
-    period: '/year',
     badge: 'Save 25%',
   },
 ];
@@ -46,17 +53,8 @@ const UpgradeScreen: React.FC = () => {
   const navigation = useNavigation();
   const { getToken, refreshSubscription } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY'>('PREMIUM_YEARLY');
+  const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'NGN'>('USD');
   const [isLoading, setIsLoading] = useState(false);
-
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
-  }, []);
 
   const handleUpgrade = async () => {
     setIsLoading(true);
@@ -67,49 +65,27 @@ const UpgradeScreen: React.FC = () => {
         return;
       }
 
-      const response = await api.createSubscription(selectedPlan, token);
+      const response = await api.createSubscription(selectedPlan, selectedCurrency, token);
 
       if (response.checkout_url) {
-        const urlOpened = await Linking.canOpenURL(response.checkout_url);
-        if (!urlOpened) {
-          Alert.alert('Error', 'Unable to open payment page.');
-          return;
-        }
-
-        await Linking.openURL(response.checkout_url);
-
-        let attempts = 0;
-        const MAX_ATTEMPTS = 30;
-        pollIntervalRef.current = setInterval(async () => {
-          attempts++;
-          await refreshSubscription();
-          const token2 = await getToken();
-          if (token2) {
-            try {
-              const sub = await api.getCurrentSubscription(token2);
-              if (sub.status === 'ACTIVE') {
-                if (pollIntervalRef.current) {
-                  clearInterval(pollIntervalRef.current);
-                  pollIntervalRef.current = null;
-                }
-                Alert.alert('Welcome to Premium!', 'Your subscription is now active.', [
-                  { text: 'Great!', onPress: () => navigation.goBack() },
-                ]);
-                return;
-              }
-            } catch (_) {}
-          }
-          if (attempts >= MAX_ATTEMPTS) {
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
+        await WebBrowser.openBrowserAsync(response.checkout_url);
+        await refreshSubscription();
+        const token2 = await getToken();
+        if (token2) {
+          try {
+            const sub = await api.getCurrentSubscription(token2);
+            if (sub.status === 'ACTIVE') {
+              Alert.alert('Welcome to Premium!', 'Your subscription is now active.', [
+                { text: 'Great!', onPress: () => navigation.goBack() },
+              ]);
+            } else {
+              Alert.alert(
+                'Still Processing',
+                'Your payment may still be processing. Check your subscription status in Settings.'
+              );
             }
-            Alert.alert(
-              'Still Processing',
-              'Your payment may still be processing. Check your subscription status in Settings.'
-            );
-          }
-        }, 3000);
+          } catch (_) {}
+        }
       }
     } catch (error: any) {
       const msg = error?.data?.message || error?.message || 'Something went wrong.';
@@ -149,40 +125,71 @@ const UpgradeScreen: React.FC = () => {
           ))}
         </View>
 
+        <View style={styles.currencyToggle}>
+          <TouchableOpacity
+            style={[
+              styles.currencyOption,
+              {
+                backgroundColor: selectedCurrency === 'USD' ? theme.colors.primary : theme.colors.surfaceContainer,
+              },
+            ]}
+            onPress={() => setSelectedCurrency('USD')}
+          >
+            <Text style={[styles.currencyText, { color: selectedCurrency === 'USD' ? '#FFF' : theme.colors.onSurface }]}>USD</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.currencyOption,
+              {
+                backgroundColor: selectedCurrency === 'NGN' ? theme.colors.primary : theme.colors.surfaceContainer,
+              },
+            ]}
+            onPress={() => setSelectedCurrency('NGN')}
+          >
+            <Text style={[styles.currencyText, { color: selectedCurrency === 'NGN' ? '#FFF' : theme.colors.onSurface }]}>NGN</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.plansContainer}>
-          {PLANS.map((plan) => (
-            <TouchableOpacity
-              key={plan.id}
-              style={[
-                styles.planCard,
-                {
-                  backgroundColor: theme.colors.surfaceContainer,
-                  borderColor: selectedPlan === plan.id ? theme.colors.primary : 'transparent',
-                },
-              ]}
-              onPress={() => setSelectedPlan(plan.id)}
-            >
-              <View style={styles.planTop}>
-                <View style={styles.planInfo}>
-                  <Text style={[styles.planName, { color: theme.colors.onSurface }]}>{plan.name}</Text>
-                  {plan.badge && (
-                    <View style={[styles.badge, { backgroundColor: theme.colors.primaryContainer }]}>
-                      <Text style={[styles.badgeText, { color: theme.colors.primary }]}>{plan.badge}</Text>
-                    </View>
-                  )}
+          {PLANS.map((plan) => {
+            const pricing = PRICES[plan.id][selectedCurrency];
+            const periodLabel = selectedCurrency === 'USD'
+              ? (plan.id === 'PREMIUM_MONTHLY' ? '/month' : '/year')
+              : (plan.id === 'PREMIUM_MONTHLY' ? '/mo' : '/yr');
+            return (
+              <TouchableOpacity
+                key={plan.id}
+                style={[
+                  styles.planCard,
+                  {
+                    backgroundColor: theme.colors.surfaceContainer,
+                    borderColor: selectedPlan === plan.id ? theme.colors.primary : 'transparent',
+                  },
+                ]}
+                onPress={() => setSelectedPlan(plan.id)}
+              >
+                <View style={styles.planTop}>
+                  <View style={styles.planInfo}>
+                    <Text style={[styles.planName, { color: theme.colors.onSurface }]}>{plan.name}</Text>
+                    {plan.badge && selectedCurrency === 'USD' && (
+                      <View style={[styles.badge, { backgroundColor: theme.colors.primaryContainer }]}>
+                        <Text style={[styles.badgeText, { color: theme.colors.primary }]}>{plan.badge}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.radioOuter}>
+                    {selectedPlan === plan.id && (
+                      <View style={[styles.radioInner, { backgroundColor: theme.colors.primary }]} />
+                    )}
+                  </View>
                 </View>
-                <View style={styles.radioOuter}>
-                  {selectedPlan === plan.id && (
-                    <View style={[styles.radioInner, { backgroundColor: theme.colors.primary }]} />
-                  )}
+                <View style={styles.priceRow}>
+                  <Text style={[styles.price, { color: theme.colors.onSurface }]}>{pricing.price}</Text>
+                  <Text style={[styles.period, { color: theme.colors.onSurfaceVariant }]}>{periodLabel}</Text>
                 </View>
-              </View>
-              <View style={styles.priceRow}>
-                <Text style={[styles.price, { color: theme.colors.onSurface }]}>{plan.price}</Text>
-                <Text style={[styles.period, { color: theme.colors.onSurfaceVariant }]}>{plan.period}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <TouchableOpacity
@@ -261,6 +268,18 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
   },
+  currencyToggle: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    marginBottom: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  currencyOption: {
+    paddingHorizontal: 32,
+    paddingVertical: 10,
+  },
+  currencyText: { fontSize: 15, fontWeight: '700' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   price: { fontSize: 28, fontWeight: '700' },
   period: { fontSize: 14 },
