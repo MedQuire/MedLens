@@ -12,9 +12,9 @@ function getSupabase() {
   });
 }
 
-const SUBSCRIPTION_PRICES: Record<string, number> = {
-  PREMIUM_MONTHLY: 9.99,
-  PREMIUM_YEARLY: 89.99,
+const SUBSCRIPTION_PRICES: Record<string, Record<string, number>> = {
+  PREMIUM_MONTHLY: { NGN: 1500, USD: 9.99 },
+  PREMIUM_YEARLY: { NGN: 13500, USD: 89.99 },
 };
 
 const SUBSCRIPTION_PLANS: Record<string, string | undefined> = {
@@ -27,10 +27,12 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
     const userId = req.userId;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { plan } = req.body;
+    const { plan, currency } = req.body;
     if (!plan || !['PREMIUM_MONTHLY', 'PREMIUM_YEARLY'].includes(plan)) {
       return res.status(400).json({ error: 'Invalid plan. Must be PREMIUM_MONTHLY or PREMIUM_YEARLY.' });
     }
+
+    const selectedCurrency = currency === 'NGN' ? 'NGN' : 'USD';
 
     const supabase = getSupabase();
 
@@ -64,8 +66,8 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
       .eq('id', userId)
       .single();
 
-    const amount = SUBSCRIPTION_PRICES[plan];
-    const amountInCents = Math.round(amount * 100);
+    const amount = SUBSCRIPTION_PRICES[plan][selectedCurrency];
+    const amountInSmallestUnit = Math.round(amount * 100);
 
     // Create pending subscription record
     const { data: subscription, error: insertError } = await supabase
@@ -88,8 +90,8 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
     try {
       const paystackPayload: any = {
         email: user?.email || 'user@medquire.app',
-        amount: amountInCents,
-        currency: 'USD',
+        amount: amountInSmallestUnit,
+        currency: selectedCurrency,
         reference,
         callback_url: process.env.PAYSTACK_REDIRECT_URL || 'https://medquire.app/payment-success',
         metadata: {
