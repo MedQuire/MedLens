@@ -152,6 +152,29 @@ export async function handlePaystackWebhook(req: Request, res: Response) {
         await processChargeSuccess(payload, res);
         break;
 
+      case 'subscription.create':
+        const createSupabase = getSupabase();
+        const createdSubCode = payload.data?.subscription_code;
+        const custCode = payload.data?.customer?.customer_code;
+        if (createdSubCode && custCode) {
+          const { data: subToUpdate } = await createSupabase
+            .from('subscriptions')
+            .select('id')
+            .eq('paystack_customer_code', custCode)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (subToUpdate) {
+            await createSupabase
+              .from('subscriptions')
+              .update({ paystack_subscription_code: createdSubCode })
+              .eq('id', subToUpdate.id);
+            console.log('[Webhook] Saved subscription code:', createdSubCode, 'for sub:', subToUpdate.id);
+          }
+        }
+        return res.status(200).json({ status: 'subscription_created' });
+
       case 'subscription.disable':
         const supabase = getSupabase();
         const subCode = payload.data?.subscription_code;

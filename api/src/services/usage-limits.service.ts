@@ -74,7 +74,7 @@ class UsageLimitsService {
     return (data || []).map((row: any) => ({
       feature: row.feature,
       count: row.count,
-      limit: row.limit,
+      limit: row.max_limit,
       resets_at: row.resets_at,
     }));
   }
