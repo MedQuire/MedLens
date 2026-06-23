@@ -29,16 +29,13 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 
-// Capture raw body for webhook signature verification (needed before JSON parsing)
-app.use((req, res, next) => {
-  (req as any).rawBody = '';
-  req.on('data', (chunk: Buffer) => {
-    (req as any).rawBody += chunk.toString('utf8');
-  });
-  req.on('end', next);
-});
-
-app.use(express.json({ limit: '50mb' }));
+// Properly capture raw body for webhook signature verification using express.json verify function
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, res, buf) => {
+    (req as any).rawBody = buf.toString('utf8');
+  }
+}));
 
 // Global Request Logger
 app.use((req, res, next) => {
