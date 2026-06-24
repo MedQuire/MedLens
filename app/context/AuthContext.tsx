@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Race the session check against a timeout to prevent hanging
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Session check timeout')), 15000)
+          setTimeout(() => reject(new Error('Session check timeout')), 10000)
         );
 
         const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
@@ -98,8 +98,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         setSession(session ?? null);
-      } catch (error) {
-        console.error('Auth initialization error:', error);
+      } catch (error: any) {
+        if (error?.message === 'Session check timeout') {
+          console.warn('[Auth] Session check timed out (possibly offline or slow connection). Continuing as guest...');
+        } else {
+          console.error('Auth initialization error:', error);
+        }
         // On timeout/error, set as guest and continue
         setSession(null);
       } finally {

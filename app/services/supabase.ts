@@ -2,6 +2,19 @@ import { Config } from '../config';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Custom fetch with timeout to prevent hanging on network/connectivity issues
+const fetchWithTimeout = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
+
+  return fetch(input, {
+    ...init,
+    signal: controller.signal,
+  }).finally(() => {
+    clearTimeout(timeoutId);
+  });
+};
+
 // Initialize Supabase client
 export const supabase = createClient(
   Config.SUPABASE.URL,
@@ -13,6 +26,9 @@ export const supabase = createClient(
       autoRefreshToken: true,
       detectSessionInUrl: false,
       flowType: 'implicit',
+    },
+    global: {
+      fetch: fetchWithTimeout,
     },
   }
 );
