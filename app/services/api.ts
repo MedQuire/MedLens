@@ -333,12 +333,13 @@ export interface CancelSubscriptionResponse {
 export async function createSubscription(
   plan: 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY',
   currency: 'USD' | 'NGN',
-  token: string
+  token: string,
+  redirect_url?: string
 ): Promise<CreateSubscriptionResponse> {
   return apiRequest<CreateSubscriptionResponse>(Config.ENDPOINTS.SUBSCRIPTIONS.CREATE, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ plan, currency }),
+    body: JSON.stringify({ plan, currency, redirect_url }),
   });
 }
 

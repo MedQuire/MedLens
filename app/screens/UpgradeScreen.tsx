@@ -14,6 +14,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import * as api from '../services/api';
 
 const PRICES: Record<string, Record<string, { price: string, raw: number }>> = {
@@ -65,10 +66,13 @@ const UpgradeScreen: React.FC = () => {
         return;
       }
 
-      const response = await api.createSubscription(selectedPlan, selectedCurrency, token);
+      // Generate an Expo deep link that automatically points back to this app
+      const redirectUrl = Linking.createURL('payment-success');
+      const response = await api.createSubscription(selectedPlan, selectedCurrency, token, redirectUrl);
 
       if (response.checkout_url) {
-        await WebBrowser.openBrowserAsync(response.checkout_url);
+        // openAuthSessionAsync listens for the redirectUrl and automatically closes the browser
+        await WebBrowser.openAuthSessionAsync(response.checkout_url, redirectUrl);
         await refreshSubscription();
         const token2 = await getToken();
         if (token2) {
