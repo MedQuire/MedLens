@@ -19,11 +19,11 @@ import * as api from '../services/api';
 
 const PRICES: Record<string, Record<string, { price: string, raw: number }>> = {
   PREMIUM_MONTHLY: {
-    USD: { price: '$9.99', raw: 9.99 },
+    USD: { price: '$5.99', raw: 5.99 },
     NGN: { price: '₦7,000', raw: 7000 },
   },
   PREMIUM_YEARLY: {
-    USD: { price: '$89.99', raw: 89.99 },
+    USD: { price: '$59.99', raw: 59.99 },
     NGN: { price: '₦75,600', raw: 75600 },
   },
 };
@@ -176,7 +176,7 @@ const UpgradeScreen: React.FC = () => {
                     {plan.id === 'PREMIUM_YEARLY' && (
                       <View style={[styles.badge, { backgroundColor: theme.colors.primaryContainer }]}>
                         <Text style={[styles.badgeText, { color: theme.colors.primary }]}>
-                          {selectedCurrency === 'USD' ? 'Save 25%' : 'Save 10%'}
+                          {selectedCurrency === 'USD' ? 'Save 15%' : 'Save 10%'}
                         </Text>
                       </View>
                     )}

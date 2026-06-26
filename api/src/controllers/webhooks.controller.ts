@@ -65,8 +65,8 @@ async function processChargeSuccess(payload: any, res: Response) {
 
   // Validate amount and currency (supports NGN and USD)
   const expectedAmounts: Record<string, Record<string, number>> = {
-    PREMIUM_MONTHLY: { NGN: 700000, USD: 999 },
-    PREMIUM_YEARLY: { NGN: 7560000, USD: 8999 },
+    PREMIUM_MONTHLY: { NGN: 700000, USD: 599 },
+    PREMIUM_YEARLY: { NGN: 7560000, USD: 5999 },
   };
 
   const currency = verification.data.currency;
