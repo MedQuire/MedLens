@@ -15,6 +15,9 @@ import UpgradeModal from '../components/UpgradeModal';
 import { PDFService } from '../services/pdf';
 import { useCabinet } from '../context/CabinetContext';
 import { FEATURES } from '../config/features';
+import { UsageService } from '../services/usage';
+import type { UsageFeature } from '../services/usage';
+import UsageLimitCard from '../components/UsageLimitCard';
 
 const DRUG_DESCRIPTIONS: Record<string, string> = {
   'advil': 'Pain & fever relief',
@@ -65,6 +68,8 @@ const CabinetScreen: React.FC = () => {
   const [viewingItem, setViewingItem] = useState<CabinetItem | null>(null);
   const [selectedDrugSummary, setSelectedDrugSummary] = useState<api.SearchResponse | null>(null);
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
+  const [usageLimitFeature, setUsageLimitFeature] = useState<UsageFeature | null>(null);
+  const [saveRemaining, setSaveRemaining] = useState<number>(3);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -78,6 +83,7 @@ const CabinetScreen: React.FC = () => {
   useEffect(() => {
     fetchStats();
     refreshCabinet(); // Ensure fresh data on mount
+    UsageService.getRemaining('save').then(setSaveRemaining);
   }, [fetchStats, refreshCabinet]);
 
   const toggleSelection = (drugKey: string) => {
@@ -136,6 +142,11 @@ const CabinetScreen: React.FC = () => {
       setUpgradeFeature('export');
       return;
     }
+    const canExport = await UsageService.canUse('export', isPro);
+    if (!canExport) {
+      setUsageLimitFeature('export');
+      return;
+    }
     
     try { 
       setLoading(true);
@@ -157,6 +168,8 @@ const CabinetScreen: React.FC = () => {
         dialogTitle: `Medication Report: ${selectedDrugSummary.drug_name}`,
         UTI: 'com.adobe.pdf'
       });
+
+      UsageService.increment('export', isPro);
     }
     catch (error: any) { 
       console.error('PDF export failed:', error); 
@@ -164,7 +177,7 @@ const CabinetScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDrugSummary]);
+  }, [selectedDrugSummary, isPro]);
 
   const handleDeleteDrug = async (item: CabinetItem) => {
     Alert.alert(
@@ -221,6 +234,13 @@ const CabinetScreen: React.FC = () => {
           <Text style={[styles.statLabel, { color: theme.colors.tertiary }]}>checks</Text>
         </View>
       </View>
+
+      {/* Remaining usage */}
+      {saveRemaining < 3 && (
+        <Text style={[styles.remainingText, { color: theme.colors.outline }]}>
+          {saveRemaining} {saveRemaining === 1 ? 'save' : 'saves'} remaining today
+        </Text>
+      )}
 
       {/* Section label */}
       <View style={styles.sectionHeader}>
@@ -422,6 +442,12 @@ const CabinetScreen: React.FC = () => {
           onClose={() => setUpgradeFeature(null)}
         />
       )}
+
+      <UsageLimitCard
+        visible={usageLimitFeature !== null}
+        feature={usageLimitFeature || 'save'}
+        onClose={() => setUsageLimitFeature(null)}
+      />
     </SafeAreaView>
   );
 };
@@ -493,6 +519,12 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontFamily: 'Outfit',
     opacity: 0.8,
+  },
+  remainingText: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'Outfit',
+    marginBottom: 16,
   },
 
   // ── Section Label ──

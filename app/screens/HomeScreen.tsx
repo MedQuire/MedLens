@@ -25,6 +25,9 @@ import RecentSearches from '../components/RecentSearches';
 import { useCabinet } from '../context/CabinetContext';
 import { supabase } from '../services/supabase';
 import { FEATURES } from '../config/features';
+import { UsageService } from '../services/usage';
+import type { UsageFeature } from '../services/usage';
+import UsageLimitCard from '../components/UsageLimitCard';
 
 
 type AppState = 'empty' | 'loading' | 'success' | 'partial' | 'notFound' | 'error';
@@ -49,12 +52,20 @@ const HomeScreen: React.FC = () => {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
+  const [usageLimitFeature, setUsageLimitFeature] = useState<UsageFeature | null>(null);
+  const [searchRemaining, setSearchRemaining] = useState<number>(5);
+  const [saveRemaining, setSaveRemaining] = useState<number>(3);
 
   // Performance and Cache Refs
   const sessionCache = useRef<Map<string, api.SearchResponse>>(new Map());
   const abortController = useRef<AbortController | null>(null);
   const suggestionAbortController = useRef<AbortController | null>(null);
   const searchStartTime = useRef<number>(0);
+
+  useEffect(() => {
+    UsageService.getRemaining('search').then(setSearchRemaining);
+    UsageService.getRemaining('save').then(setSaveRemaining);
+  }, []);
 
   const prefetchELI12 = useCallback(async (data: any, summary: any) => {
     if (!data || !summary) return;
@@ -97,6 +108,13 @@ const HomeScreen: React.FC = () => {
 
   const handleSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
+
+    const canSearch = await UsageService.canUse('search', isPro);
+    if (!canSearch) {
+      setUsageLimitFeature('search');
+      return;
+    }
+
     const cleanQuery = searchQuery.trim().toLowerCase();
 
     // 1. Cancel previous in-flight request
@@ -278,7 +296,10 @@ const HomeScreen: React.FC = () => {
           const finalResponse = await api.searchMedication(searchQuery.trim(), false);
           sessionCache.current.set(cleanQuery, finalResponse);
           setBaseResult(finalResponse);
-          setState('success');
+      setState('success');
+
+      UsageService.increment('search', isPro);
+      UsageService.getRemaining('search').then(setSearchRemaining);
           return;
         } catch (e) { }
       }
@@ -344,6 +365,12 @@ const HomeScreen: React.FC = () => {
       return;
     }
 
+    const canSave = await UsageService.canUse('save', isPro);
+    if (!canSave) {
+      setUsageLimitFeature('save');
+      return;
+    }
+
     const drugName = baseResult.drug_name;
     const drugNameLower = drugName.toLowerCase();
     const drugKey = drugNameLower.replace(/\s+/g, '-');
@@ -359,6 +386,8 @@ const HomeScreen: React.FC = () => {
         const description = baseResult.summary.what_it_does || undefined;
         await addToCabinet(drugName, drugKey, description);
         console.log(`[Cabinet] Add successful for: ${drugName} with desc: ${description}`);
+        UsageService.increment('save', isPro);
+        UsageService.getRemaining('save').then(setSaveRemaining);
       } catch (error: any) {
         console.error('[Cabinet] Save failed:', error);
         if (error.status === 403 && error.error === 'free_plan_limit') {
@@ -372,7 +401,7 @@ const HomeScreen: React.FC = () => {
     setBaseResult(null);
     setEli12Result(null);
     setQuery('');
-  }, [baseResult, isGuest, getToken]);
+  }, [baseResult, isGuest, getToken, isPro]);
 
   const handleExport = useCallback(async () => {
     if (!baseResult) return;
@@ -384,6 +413,11 @@ const HomeScreen: React.FC = () => {
     }
     if (!isPro && FEATURES.ENABLE_PRO) {
       setUpgradeFeature('export');
+      return;
+    }
+    const canExport = await UsageService.canUse('export', isPro);
+    if (!canExport) {
+      setUsageLimitFeature('export');
       return;
     }
     const currentSummary = isELI12 && eli12Result ? eli12Result : baseResult.summary;
@@ -407,6 +441,8 @@ const HomeScreen: React.FC = () => {
         dialogTitle: `Medication Report: ${baseResult.drug_name}`,
         UTI: 'com.adobe.pdf'
       });
+
+      UsageService.increment('export', isPro);
     }
     catch (error: any) {
       console.error('PDF export failed:', error);
@@ -414,7 +450,7 @@ const HomeScreen: React.FC = () => {
     } finally {
       setExportLoading(false);
     }
-  }, [baseResult, isELI12, eli12Result, isGuest, query, navigation]);
+  }, [baseResult, isELI12, eli12Result, isGuest, query, navigation, isPro]);
 
   // Restore pending search context after Auth transition
   useEffect(() => {
@@ -533,6 +569,11 @@ const HomeScreen: React.FC = () => {
           <Text style={[styles.headlineText, { color: theme.colors.onSurfaceVariant }]}>
             How can I help you with your medication today?
           </Text>
+          {searchRemaining < 5 && (
+            <Text style={[styles.remainingText, { color: theme.colors.outline }]}>
+              {searchRemaining} {searchRemaining === 1 ? 'search' : 'searches'} remaining today
+            </Text>
+          )}
         </View>
       )}
 
@@ -630,6 +671,12 @@ const HomeScreen: React.FC = () => {
           onClose={() => setUpgradeFeature(null)}
         />
       )}
+
+      <UsageLimitCard
+        visible={usageLimitFeature !== null}
+        feature={usageLimitFeature || 'search'}
+        onClose={() => setUsageLimitFeature(null)}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -718,6 +765,12 @@ const makeStyles = (theme: ThemeContextType) => StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
     lineHeight: 38,
+  },
+  remainingText: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 12,
   },
   staticHeadlineWrapper: {
     ...StyleSheet.absoluteFillObject,

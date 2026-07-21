@@ -13,6 +13,9 @@ import { LocalStorageService } from '../services/storage';
 import InteractionSkeleton from '../components/InteractionSkeleton';
 import UpgradeModal from '../components/UpgradeModal';
 import { FEATURES } from '../config/features';
+import { UsageService } from '../services/usage';
+import type { UsageFeature } from '../services/usage';
+import UsageLimitCard from '../components/UsageLimitCard';
 
 
 
@@ -24,7 +27,7 @@ interface DrugItem {
 
 const InteractionScreen: React.FC = () => {
   const theme = useTheme();
-  const { user, getToken } = useAuth();
+  const { user, isPro, getToken } = useAuth();
   const route = (useRoute as any)();
   const navigation = (useNavigation as any)();
   const [selectedDrugs, setSelectedDrugs] = useState<string[]>([]);
@@ -34,6 +37,8 @@ const InteractionScreen: React.FC = () => {
   const [isELI12, setIsELI12] = useState(false);
   const [result, setResult] = useState<api.InteractionResponse | null>(null);
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
+  const [usageLimitFeature, setUsageLimitFeature] = useState<UsageFeature | null>(null);
+  const [interactionRemaining, setInteractionRemaining] = useState<number>(2);
 
   // Load cabinet items for selection
   useEffect(() => {
@@ -93,6 +98,7 @@ const InteractionScreen: React.FC = () => {
     };
     
     loadCabinetItems();
+    UsageService.getRemaining('interaction').then(setInteractionRemaining);
   }, [user, getToken, route.params?.drugKeys]);
 
   const toggleDrug = (key: string) => {
@@ -110,6 +116,12 @@ const InteractionScreen: React.FC = () => {
       return;
     }
 
+    const canCheck = await UsageService.canUse('interaction', isPro);
+    if (!canCheck) {
+      setUsageLimitFeature('interaction');
+      return;
+    }
+
     setChecking(true);
     setResult(null);
     
@@ -119,6 +131,8 @@ const InteractionScreen: React.FC = () => {
       if (cached) {
         setResult(cached);
         LocalStorageService.incrementInteractionCount();
+        UsageService.increment('interaction', isPro);
+        UsageService.getRemaining('interaction').then(setInteractionRemaining);
         return;
       }
 
@@ -126,8 +140,8 @@ const InteractionScreen: React.FC = () => {
       const response = await api.checkInteractions(selectedDrugs);
       setResult(response);
       LocalStorageService.incrementInteractionCount();
-
-      // 3. Save to Cache
+      UsageService.increment('interaction', isPro);
+      UsageService.getRemaining('interaction').then(setInteractionRemaining);
       await LocalStorageService.setCachedInteraction(selectedDrugs, response);
     } catch (error: any) {
       if (error.status === 403 && error.error === 'free_plan_limit') {
@@ -140,7 +154,7 @@ const InteractionScreen: React.FC = () => {
     } finally {
       setChecking(false);
     }
-  }, [selectedDrugs]);
+  }, [selectedDrugs, isPro]);
 
   if (loading) {
     return (
@@ -209,6 +223,11 @@ const InteractionScreen: React.FC = () => {
             <Text style={[styles.headerSubtitle, { color: theme.colors.outline }]}>
               Safety check for combined meds
             </Text>
+            {interactionRemaining < 2 && (
+              <Text style={[styles.remainingText, { color: theme.colors.outline }]}>
+                {interactionRemaining} {interactionRemaining === 1 ? 'check' : 'checks'} remaining today
+              </Text>
+            )}
           </View>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={theme.colors.onSurfaceVariant} />
@@ -398,6 +417,12 @@ const InteractionScreen: React.FC = () => {
           onClose={() => setUpgradeFeature(null)}
         />
       )}
+
+      <UsageLimitCard
+        visible={usageLimitFeature !== null}
+        feature={usageLimitFeature || 'interaction'}
+        onClose={() => setUsageLimitFeature(null)}
+      />
     </>
   );
 };
@@ -431,6 +456,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: 'Outfit',
     marginTop: 2,
+  },
+  remainingText: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'Outfit',
+    marginTop: 4,
   },
   loadingContainer: {
     flex: 1,
