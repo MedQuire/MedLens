@@ -88,6 +88,16 @@ async function getLimit(feature: UsageFeature): Promise<number> {
   return DAILY_LIMITS[feature];
 }
 
+async function getAllUsage(): Promise<Record<UsageFeature, { used: number; remaining: number }>> {
+  const usage = await loadUsage();
+  return {
+    search: { used: usage.search, remaining: Math.max(0, DAILY_LIMITS.search - usage.search) },
+    save: { used: usage.save, remaining: Math.max(0, DAILY_LIMITS.save - usage.save) },
+    export: { used: usage.export, remaining: Math.max(0, DAILY_LIMITS.export - usage.export) },
+    interaction: { used: usage.interaction, remaining: Math.max(0, DAILY_LIMITS.interaction - usage.interaction) },
+  };
+}
+
 export const UsageService = {
   DAILY_LIMITS,
   canUse,
@@ -95,4 +105,5 @@ export const UsageService = {
   getRemaining,
   getAllRemaining,
   getLimit,
+  getAllUsage,
 };

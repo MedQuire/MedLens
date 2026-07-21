@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,14 +14,26 @@ interface UsageLimitCardProps {
 
 const FEATURE_META: Record<UsageFeature, { icon: string; label: string; limit: number }> = {
   search: { icon: 'search-outline', label: 'searches/day', limit: 5 },
-  save: { icon: 'archive-outline', label: 'saves/day', limit: 3 },
+  save: { icon: 'archive-outline', label: 'medicine saves/day', limit: 3 },
   export: { icon: 'share-outline', label: 'exports/day', limit: 2 },
-  interaction: { icon: 'git-network-outline', label: 'checks/day', limit: 2 },
+  interaction: { icon: 'git-network-outline', label: 'interaction checks/day', limit: 2 },
 };
 
 const UsageLimitCard: React.FC<UsageLimitCardProps> = ({ visible, onClose, feature }) => {
   const theme = useTheme();
   const meta = FEATURE_META[feature];
+  const [usageData, setUsageData] = useState<Record<UsageFeature, { used: number; remaining: number }>>({
+    search: { used: 0, remaining: 5 },
+    save: { used: 0, remaining: 3 },
+    export: { used: 0, remaining: 2 },
+    interaction: { used: 0, remaining: 2 },
+  });
+
+  useEffect(() => {
+    if (visible) {
+      UsageService.getAllUsage().then(setUsageData);
+    }
+  }, [visible]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -40,19 +52,19 @@ const UsageLimitCard: React.FC<UsageLimitCardProps> = ({ visible, onClose, featu
             <Text style={[styles.limitTitle, { color: theme.colors.onSurface }]}>Your free plan allows:</Text>
             <View style={styles.limitRow}>
               <Ionicons name="search-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>5 searches/day</Text>
+              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>5 searches/day - ({usageData.search.used}/{usageData.search.remaining})</Text>
             </View>
             <View style={styles.limitRow}>
               <Ionicons name="archive-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>3 medicine saves/day</Text>
+              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>3 medicine saves/day - ({usageData.save.used}/{usageData.save.remaining})</Text>
             </View>
             <View style={styles.limitRow}>
               <Ionicons name="share-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>2 exports/day</Text>
+              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>2 exports/day - ({usageData.export.used}/{usageData.export.remaining})</Text>
             </View>
             <View style={styles.limitRow}>
               <Ionicons name="git-network-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>2 interaction checks/day</Text>
+              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>2 interaction checks/day - ({usageData.interaction.used}/{usageData.interaction.remaining})</Text>
             </View>
           </View>
 
