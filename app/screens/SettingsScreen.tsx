@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import SupportModal from '../components/SupportModal';
+import { FEATURES } from '../config/features';
 
 type SettingsItem = 
   | { label: string; value: string; type: 'info' }
@@ -192,7 +193,7 @@ const SettingsScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {!isPro && (
+            {!isPro && FEATURES.ENABLE_PRO && (
               <TouchableOpacity style={styles.upgradeBanner} onPress={handleUpgrade}>
                 <Ionicons name="sparkles" size={16} color={theme.colors.onTertiary} />
                 <Text style={[styles.upgradeText, { color: theme.colors.onTertiary }]}>Upgrade to Pro</Text>

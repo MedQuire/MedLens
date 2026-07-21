@@ -12,6 +12,7 @@ import { useTheme, ThemeContextType } from '../theme/ThemeProvider';
 import { LocalStorageService } from '../services/storage';
 import InteractionSkeleton from '../components/InteractionSkeleton';
 import UpgradeModal from '../components/UpgradeModal';
+import { FEATURES } from '../config/features';
 
 
 
@@ -390,11 +391,13 @@ const InteractionScreen: React.FC = () => {
       </View>
     )}
     </ScrollView>
-      <UpgradeModal
-        visible={upgradeFeature !== null}
-        feature={upgradeFeature || 'interaction'}
-        onClose={() => setUpgradeFeature(null)}
-      />
+      {FEATURES.ENABLE_PRO && (
+        <UpgradeModal
+          visible={upgradeFeature !== null}
+          feature={upgradeFeature || 'interaction'}
+          onClose={() => setUpgradeFeature(null)}
+        />
+      )}
     </>
   );
 };

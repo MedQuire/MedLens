@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocalStorageService } from '../services/storage';
 import * as api from '../services/api';
 import type { CurrentSubscriptionResponse } from '../services/api';
+import { FEATURES } from '../config/features';
 
 if (Platform.OS === 'web') {
   WebBrowser.maybeCompleteAuthSession();
@@ -510,6 +511,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const refreshSubscription = useCallback(async () => {
+    if (!FEATURES.ENABLE_PRO) {
+      setSubscription(null);
+      return;
+    }
     try {
       if (isGuest || !session?.access_token) {
         setSubscription(null);
@@ -525,7 +530,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Fetch subscription on auth load
   useEffect(() => {
-    if (session?.access_token && !isGuest) {
+    if (FEATURES.ENABLE_PRO && session?.access_token && !isGuest) {
       refreshSubscription();
     } else {
       setSubscription(null);

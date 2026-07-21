@@ -14,6 +14,7 @@ import SummaryCard from '../components/SummaryCard';
 import UpgradeModal from '../components/UpgradeModal';
 import { PDFService } from '../services/pdf';
 import { useCabinet } from '../context/CabinetContext';
+import { FEATURES } from '../config/features';
 
 const DRUG_DESCRIPTIONS: Record<string, string> = {
   'advil': 'Pain & fever relief',
@@ -131,7 +132,7 @@ const CabinetScreen: React.FC = () => {
 
   const handleExport = useCallback(async () => {
     if (!selectedDrugSummary) return;
-    if (!isPro) {
+    if (!isPro && FEATURES.ENABLE_PRO) {
       setUpgradeFeature('export');
       return;
     }
@@ -414,11 +415,13 @@ const CabinetScreen: React.FC = () => {
         </View>
       </Modal>
 
-      <UpgradeModal
-        visible={upgradeFeature !== null}
-        feature={upgradeFeature || 'export'}
-        onClose={() => setUpgradeFeature(null)}
-      />
+      {FEATURES.ENABLE_PRO && (
+        <UpgradeModal
+          visible={upgradeFeature !== null}
+          feature={upgradeFeature || 'export'}
+          onClose={() => setUpgradeFeature(null)}
+        />
+      )}
     </SafeAreaView>
   );
 };

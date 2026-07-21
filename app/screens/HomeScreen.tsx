@@ -24,6 +24,7 @@ import { LocalStorageService } from '../services/storage';
 import RecentSearches from '../components/RecentSearches';
 import { useCabinet } from '../context/CabinetContext';
 import { supabase } from '../services/supabase';
+import { FEATURES } from '../config/features';
 
 
 type AppState = 'empty' | 'loading' | 'success' | 'partial' | 'notFound' | 'error';
@@ -381,7 +382,7 @@ const HomeScreen: React.FC = () => {
       navigation.navigate('SignUp');
       return;
     }
-    if (!isPro) {
+    if (!isPro && FEATURES.ENABLE_PRO) {
       setUpgradeFeature('export');
       return;
     }
@@ -622,11 +623,13 @@ const HomeScreen: React.FC = () => {
     >
       {content}
 
-      <UpgradeModal
-        visible={upgradeFeature !== null}
-        feature={upgradeFeature || 'search'}
-        onClose={() => setUpgradeFeature(null)}
-      />
+      {FEATURES.ENABLE_PRO && (
+        <UpgradeModal
+          visible={upgradeFeature !== null}
+          feature={upgradeFeature || 'search'}
+          onClose={() => setUpgradeFeature(null)}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };

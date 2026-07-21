@@ -24,6 +24,7 @@ import {
 } from '../screens';
 import { useAuth } from '../context/AuthContext';
 import { CabinetProvider } from '../context/CabinetContext';
+import { FEATURES } from '../config/features';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -37,8 +38,8 @@ export type RootStackParamList = {
   VerifyOtp: { email: string };
   ResetPassword: { email: string };
   Interaction: { drugKeys?: string[] };
-  Upgrade: undefined;
-};
+} & (typeof FEATURES.ENABLE_PRO extends true ? { Upgrade: undefined } : {});
+
 
 export type DrawerParamList = {
   HomeDrawer: { searchQuery?: string };
@@ -293,11 +294,13 @@ const AppNavigator = () => {
             component={InteractionScreen}
             options={{ presentation: 'modal', gestureEnabled: false }}
           />
-          <Stack.Screen
-            name="Upgrade"
-            component={UpgradeScreen}
-            options={{ gestureEnabled: false }}
-          />
+          {FEATURES.ENABLE_PRO && (
+            <Stack.Screen
+              name="Upgrade"
+              component={UpgradeScreen}
+              options={{ gestureEnabled: false }}
+            />
+          )}
         </Stack.Navigator>
       </NavigationContainer>
     </CabinetProvider>
