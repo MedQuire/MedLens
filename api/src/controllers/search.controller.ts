@@ -5,9 +5,7 @@ import openFDAService from '../services/openfda.service';
 import deepseekService, { AISummary } from '../services/deepseek.service';
 import geminiService from '../services/gemini.service';
 import UsageLimitsService from '../services/usage-limits.service';
-
-// In-memory cache for medication summaries
-const searchCache = new Map<string, any>();
+import redisService from '../services/redis/redis.service';
 
 // Extract userId from auth header without blocking unauthenticated users
 const supabaseClient = createClient(
@@ -64,9 +62,10 @@ export const searchMedication = async (req: Request, res: Response) => {
     console.log(`[Search] Query: ${query}, ELI12: ${eli12}`);
 
     const cacheKey = `v2_${query.toLowerCase().trim()}_${eli12 ? 'eli' : 'std'}`;
-    if (searchCache.has(cacheKey)) {
-      console.log(`[Search] Cache hit for: ${cacheKey}`);
-      return res.json(searchCache.get(cacheKey));
+    const cachedResult = await redisService.get(cacheKey);
+    if (cachedResult) {
+      console.log(`[Search] Redis cache hit for: ${cacheKey}`);
+      return res.json(cachedResult);
     }
 
     // Stage 1: Fetch from OpenFDA
@@ -150,8 +149,8 @@ export const searchMedication = async (req: Request, res: Response) => {
       disclaimer: 'MedQuire simplifies medical information for understanding. It does not replace professional medical advice.',
     };
 
-    // Save to cache
-    searchCache.set(cacheKey, response);
+    // Save to Redis cache (expire in 30 days = 2592000 seconds)
+    await redisService.set(cacheKey, response, 2592000);
 
     // Track usage for authenticated free users (fire-and-forget)
     if (userId) {
