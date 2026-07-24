@@ -22,6 +22,16 @@ import { checkUsageLimit, requireProForExport } from './middleware/usage-limits.
 import UsageLimitsService from './services/usage-limits.service';
 import OpenFDAService from './services/openfda.service';
 import DeepSeekService from './services/deepseek.service';
+import emailService from './services/email/email.service';
+import { TransactionalTemplates } from './services/email/email.templates';
+import { createClient } from '@supabase/supabase-js';
+
+// Setup Supabase for manual token extraction in un-guarded routes
+const supabaseAuth = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_ANON_KEY || '',
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -193,6 +203,25 @@ app.post('/api/interactions', rateLimiter(60000, 20), async (req: any, res) => {
       eli12_summary: eli12Summary,
       severity: analysis.severity
     });
+
+    // Send email asynchronously if user is authenticated
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const { data: { user } } = await supabaseAuth.auth.getUser(token);
+        if (user?.email) {
+          const html = TransactionalTemplates.interactionReportReady('MedQuire User');
+          emailService.sendEmail({
+            to: user.email,
+            subject: 'Your Drug Interaction Report is Ready',
+            html
+          }).catch(e => console.warn('[Interactions] Failed to send email:', e));
+        }
+      } catch (e) {
+        // Ignore auth extraction errors for optional emails
+      }
+    }
 
   } catch (error: any) {
     console.error('Interaction API Error:', error.message);

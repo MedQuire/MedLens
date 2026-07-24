@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import PaystackService from '../services/paystack.service';
+import emailService from '../services/email/email.service';
+import { TransactionalTemplates } from '../services/email/email.templates';
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -113,6 +115,17 @@ async function processChargeSuccess(payload: any, res: Response) {
     }
 
     console.log('[Webhook] Subscription activated:', subscription.id);
+    
+    // Fetch user email to send notification
+    const { data: userData } = await supabase.auth.admin.getUserById(subscription.user_id);
+    if (userData?.user?.email) {
+      const html = TransactionalTemplates.subscriptionActivated('MedQuire User', subscription.plan);
+      emailService.sendEmail({
+        to: userData.user.email,
+        subject: 'Welcome to MedQuire Premium!',
+        html
+      }).catch(e => console.warn('[Webhook] Failed to send activation email:', e));
+    }
   } else {
     const { error: rpcError } = await supabase.rpc('process_subscription_renewal', {
       p_subscription_id: subscription.id,
@@ -129,6 +142,17 @@ async function processChargeSuccess(payload: any, res: Response) {
     }
 
     console.log('[Webhook] Subscription renewed:', subscription.id);
+
+    // Fetch user email to send notification
+    const { data: userData } = await supabase.auth.admin.getUserById(subscription.user_id);
+    if (userData?.user?.email) {
+      const html = TransactionalTemplates.subscriptionRenewed('MedQuire User', subscription.plan);
+      emailService.sendEmail({
+        to: userData.user.email,
+        subject: 'MedQuire Subscription Renewed',
+        html
+      }).catch(e => console.warn('[Webhook] Failed to send renewal email:', e));
+    }
   }
 
   return res.status(200).json({ status: 'success' });
@@ -192,6 +216,20 @@ export async function handlePaystackWebhook(req: Request, res: Response) {
               p_subscription_id: sub.id,
             });
             console.log('[Webhook] Subscription cancelled:', sub.id);
+            
+            // Send cancellation email
+            const { data: subDetails } = await supabase.from('subscriptions').select('user_id').eq('id', sub.id).single();
+            if (subDetails?.user_id) {
+               const { data: userData } = await supabase.auth.admin.getUserById(subDetails.user_id);
+               if (userData?.user?.email) {
+                 const html = TransactionalTemplates.subscriptionCancelled('MedQuire User');
+                 emailService.sendEmail({
+                   to: userData.user.email,
+                   subject: 'MedQuire Subscription Cancelled',
+                   html
+                 }).catch(e => console.warn('[Webhook] Failed to send cancellation email:', e));
+               }
+            }
           }
         }
         return res.status(200).json({ status: 'cancelled' });

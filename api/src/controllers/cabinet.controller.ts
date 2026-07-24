@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import UsageLimitsService from '../services/usage-limits.service';
+import emailService from '../services/email/email.service';
+import { TransactionalTemplates } from '../services/email/email.templates';
 
 // Creates a Supabase client scoped to the authenticated user's JWT
 // This ensures RLS policies apply correctly — the user can only see their own data
@@ -178,6 +180,16 @@ export const saveCabinetItem = async (req: AuthenticatedRequest, res: Response) 
       );
     }
 
+    // Send email notification
+    if (req.userEmail) {
+      const html = TransactionalTemplates.medicationSaved('MedQuire User', drug_name);
+      emailService.sendEmail({
+        to: req.userEmail,
+        subject: `Medication Saved: ${drug_name}`,
+        html
+      }).catch(e => console.warn('[Cabinet] Failed to send save email:', e));
+    }
+
     return res.json({ success: true, item: data });
   } catch (error: any) {
     console.error('[Cabinet] saveCabinetItem error:', error.message);
@@ -197,6 +209,16 @@ export const deleteCabinetItem = async (req: AuthenticatedRequest, res: Response
 
     console.log(`[Cabinet] Hard deleting item ${id} for user ${req.userId}`);
 
+    // Since we don't have the drug name natively in the delete request, we fetch it first.
+    // Fetch drug name to send email
+    const { data: itemToDelete } = await supabase
+      .from('cabinet_items')
+      .select('drug_name')
+      .match({ id: id, user_id: req.userId })
+      .single();
+      
+    const drugNameForEmail = itemToDelete?.drug_name || 'Medication';
+
     const { error, status } = await supabase
       .from('cabinet_items')
       .delete()
@@ -207,6 +229,15 @@ export const deleteCabinetItem = async (req: AuthenticatedRequest, res: Response
       return res.status(500).json({ error: 'Failed to delete medication from your database', message: error.message });
     }
 
+    if (req.userEmail) {
+      const html = TransactionalTemplates.medicationRemoved('MedQuire User', drugNameForEmail);
+      emailService.sendEmail({
+        to: req.userEmail,
+        subject: `Medication Removed: ${drugNameForEmail}`,
+        html
+      }).catch(e => console.warn('[Cabinet] Failed to send remove email:', e));
+    }
+    
     return res.json({ success: true, message: 'Medication removed from cabinet' });
   } catch (error: any) {
     console.error('[Cabinet] deleteCabinetItem error:', error.message);

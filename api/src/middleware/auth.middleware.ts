@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export interface AuthenticatedRequest extends Request {
   userId?: string;
   userToken?: string;
+  userEmail?: string;
 }
 
 export const requireAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -75,6 +76,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     console.log(`[Auth] Success: ${user.id} accessed ${req.url}`);
     req.userId = user.id;
     req.userToken = token;
+    req.userEmail = user.email;
     next();
   } catch (error: any) {
     console.error('[Auth] Unexpected error in middleware:', error.message);
