@@ -223,15 +223,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log(`[Auth] Sign out state: Onboarding done=${onboardingCompleted}, Auth history=${hasAuthenticatedBefore}`);
       
       // Clear Google Session to prevent auto-login
-      try {
-        const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-        GoogleSignin.configure({
-          webClientId: '990313463556-ve95uh0hvtsoknbpr0s39uuvhi1uf7g7.apps.googleusercontent.com',
-        });
-        await GoogleSignin.signOut();
-      } catch (googleError) {
-        console.log('[Auth] Google sign out error (expected if not signed in with Google):', googleError);
-      }
+      // Temporarily disabled for Expo Go compatibility:
+      // try {
+      //   const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      //   GoogleSignin.configure({
+      //     webClientId: '990313463556-ve95uh0hvtsoknbpr0s39uuvhi1uf7g7.apps.googleusercontent.com',
+      //   });
+      //   await GoogleSignin.signOut();
+      // } catch (googleError) {
+      //   console.log('[Auth] Google sign out error:', googleError);
+      // }
 
       await supabase.auth.signOut();
       setSession(null);
@@ -251,15 +252,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const userId = user?.id;
       // Clear any existing session to ensure clean guest state
-      try {
-        const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-        GoogleSignin.configure({
-          webClientId: '990313463556-ve95uh0hvtsoknbpr0s39uuvhi1uf7g7.apps.googleusercontent.com',
-        });
-        await GoogleSignin.signOut();
-      } catch (googleError) {
-        console.log('[Auth] Google sign out error (expected if not signed in with Google):', googleError);
-      }
+      // Temporarily disabled for Expo Go compatibility:
+      // try {
+      //   const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      //   GoogleSignin.configure({
+      //     webClientId: '990313463556-ve95uh0hvtsoknbpr0s39uuvhi1uf7g7.apps.googleusercontent.com',
+      //   });
+      //   await GoogleSignin.signOut();
+      // } catch (googleError) {
+      //   console.log('[Auth] Google sign out error:', googleError);
+      // }
 
       await supabase.auth.signOut();
       setSession(null);
