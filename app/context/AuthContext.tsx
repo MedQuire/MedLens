@@ -469,10 +469,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const sendResetOtp = async (email: string) => {
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: false }
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
       return { error };
     } catch (error) {
       console.error('Send reset OTP error:', error);
@@ -485,7 +482,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { error } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'email'
+        type: 'recovery'
       });
       return { error };
     } catch (error) {
