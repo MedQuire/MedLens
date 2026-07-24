@@ -66,6 +66,13 @@ export const AuthTemplates = {
     <p>Please enter the following 6-digit verification code in the app to reset your password:</p>
     ${highlightCard('{{ .Token }}', true)}
     <p>This code will expire shortly. If you didn't request a password reset, you can safely ignore this email.</p>
+  `),
+  passwordChanged: baseLayout(`
+    <h2>Password Successfully Changed</h2>
+    <p>Hi there,</p>
+    <p>This is a confirmation that the password for your account ({{ .Email }}) has just been changed.</p>
+    ${highlightCard('Password Updated')}
+    <p>If you did not make this change, please contact our support team immediately to secure your account.</p>
   `)
 };
 

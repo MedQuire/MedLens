@@ -204,24 +204,7 @@ app.post('/api/interactions', rateLimiter(60000, 20), async (req: any, res) => {
       severity: analysis.severity
     });
 
-    // Send email asynchronously if user is authenticated
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      try {
-        const token = authHeader.split(' ')[1];
-        const { data: { user } } = await supabaseAuth.auth.getUser(token);
-        if (user?.email) {
-          const html = TransactionalTemplates.interactionReportReady('MedQuire User');
-          emailService.sendEmail({
-            to: user.email,
-            subject: 'Your Drug Interaction Report is Ready',
-            html
-          }).catch(e => console.warn('[Interactions] Failed to send email:', e));
-        }
-      } catch (e) {
-        // Ignore auth extraction errors for optional emails
-      }
-    }
+    // Email notification for interaction report has been removed.
 
   } catch (error: any) {
     console.error('Interaction API Error:', error.message);

@@ -180,15 +180,7 @@ export const saveCabinetItem = async (req: AuthenticatedRequest, res: Response) 
       );
     }
 
-    // Send email notification
-    if (req.userEmail) {
-      const html = TransactionalTemplates.medicationSaved('MedQuire User', drug_name);
-      emailService.sendEmail({
-        to: req.userEmail,
-        subject: `Medication Saved: ${drug_name}`,
-        html
-      }).catch(e => console.warn('[Cabinet] Failed to send save email:', e));
-    }
+    // Email notification for saving cabinet items has been removed.
 
     return res.json({ success: true, item: data });
   } catch (error: any) {
@@ -229,15 +221,7 @@ export const deleteCabinetItem = async (req: AuthenticatedRequest, res: Response
       return res.status(500).json({ error: 'Failed to delete medication from your database', message: error.message });
     }
 
-    if (req.userEmail) {
-      const html = TransactionalTemplates.medicationRemoved('MedQuire User', drugNameForEmail);
-      emailService.sendEmail({
-        to: req.userEmail,
-        subject: `Medication Removed: ${drugNameForEmail}`,
-        html
-      }).catch(e => console.warn('[Cabinet] Failed to send remove email:', e));
-    }
-    
+    // Email notification for removing cabinet items has been removed.
     return res.json({ success: true, message: 'Medication removed from cabinet' });
   } catch (error: any) {
     console.error('[Cabinet] deleteCabinetItem error:', error.message);
