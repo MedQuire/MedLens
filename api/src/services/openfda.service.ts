@@ -1,4 +1,5 @@
 import axios from 'axios';
+import RedisService from './redis/redis.service';
 
 export interface NormalizedDrugData {
   drug_name: string;
@@ -19,6 +20,14 @@ export class OpenFDAService {
   async searchDrug(query: string): Promise<NormalizedDrugData | null> {
     try {
       const trimmedQuery = query.trim().toLowerCase();
+      const cacheKey = `openfda_search_${trimmedQuery}`;
+      
+      const cachedResult = await RedisService.get<NormalizedDrugData | null>(cacheKey);
+      if (cachedResult !== null) {
+        console.log(`[OpenFDA] Cache hit for "${trimmedQuery}"`);
+        return cachedResult;
+      }
+
       const encodedQuery = encodeURIComponent(trimmedQuery);
       
       const hasSpaces = trimmedQuery.includes(' ');
@@ -72,7 +81,7 @@ export class OpenFDAService {
         return text.replace(/\s+/g, ' ').trim();
       };
 
-      return {
+      const finalData: NormalizedDrugData = {
         drug_name: this.capitalizeWords(brandNames[0] || genericNames[0] || query),
         indications: sanitize(bestResult.indications_and_usage?.[0] || bestResult.purpose?.[0] || bestResult.indications?.[0] || bestResult.description?.[0] || bestResult.usage?.[0]),
         dosage: sanitize(bestResult.dosage_and_administration?.[0] || bestResult.how_to_use?.[0] || bestResult.instructions_for_use?.[0] || bestResult.dosage?.[0]),
@@ -80,6 +89,11 @@ export class OpenFDAService {
         side_effects: sanitize(bestResult.adverse_reactions?.[0] || bestResult.side_effects?.[0] || bestResult.adverse_reactions_table?.[0]),
         drug_interactions: sanitize(bestResult.drug_interactions?.[0] || bestResult.interactions?.[0])
       };
+
+      // Cache the result for 24 hours (86400 seconds)
+      await RedisService.set(cacheKey, finalData, 86400);
+
+      return finalData;
     } catch (error: any) {
       if (error.response?.status === 404) {
         return null;
@@ -91,7 +105,16 @@ export class OpenFDAService {
 
   async getAutocomplete(query: string): Promise<string[]> {
     try {
-      const encodedQuery = encodeURIComponent(query);
+      const trimmedQuery = query.trim().toLowerCase();
+      if (!trimmedQuery) return [];
+
+      const cacheKey = `openfda_autocomplete_${trimmedQuery}`;
+      const cachedResult = await RedisService.get<string[]>(cacheKey);
+      if (cachedResult) {
+        return cachedResult;
+      }
+
+      const encodedQuery = encodeURIComponent(trimmedQuery);
       
       // We perform two counts to get both brand and generic suggestions
       const brandUrl = `${this.baseUrl}?search=openfda.brand_name:${encodedQuery}*&limit=10${this.apiKey ? `&api_key=${this.apiKey}` : ''}&count=openfda.brand_name.exact`;
@@ -118,7 +141,12 @@ export class OpenFDAService {
         });
       }
 
-      return Array.from(suggestions).slice(0, 10);
+      const finalSuggestions = Array.from(suggestions).slice(0, 10);
+      
+      // Cache for 24 hours (86400 seconds)
+      await RedisService.set(cacheKey, finalSuggestions, 86400);
+
+      return finalSuggestions;
     } catch (error: any) {
       console.error('OpenFDA Autocomplete error:', error.message);
       return [];

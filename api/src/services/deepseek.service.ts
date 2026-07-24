@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { NormalizedDrugData } from './openfda.service';
+import RedisService from './redis/redis.service';
+import crypto from 'crypto';
 
 export interface AISummary {
   what_it_does: string;
@@ -66,6 +68,13 @@ export class DeepSeekService {
       Side Effects: ${this.trimInput(data.side_effects)}
     `;
 
+    const cacheKey = `deepseek_summary_${crypto.createHash('md5').update(userPrompt).digest('hex')}`;
+    const cachedResult = await RedisService.get<AISummary>(cacheKey);
+    if (cachedResult) {
+      console.log(`[DeepSeek] Cache hit for summary: ${data.drug_name}`);
+      return cachedResult;
+    }
+
     try {
       const response = await axios.post(
         this.baseUrl,
@@ -86,7 +95,12 @@ export class DeepSeekService {
         }
       );
 
-      return JSON.parse(response.data.choices[0].message.content);
+      const result = JSON.parse(response.data.choices[0].message.content);
+      
+      // Cache for 24 hours (86400 seconds)
+      await RedisService.set(cacheKey, result, 86400);
+
+      return result;
     } catch (error: any) {
       console.error('DeepSeek AI error:', error.message);
       throw new Error(`AI generation failed: ${error.message}`);
@@ -122,6 +136,13 @@ export class DeepSeekService {
       Side effects: ${summary.side_effects}
     `;
 
+    const cacheKey = `deepseek_eli12_${crypto.createHash('md5').update(userPrompt).digest('hex')}`;
+    const cachedResult = await RedisService.get<AISummary>(cacheKey);
+    if (cachedResult) {
+      console.log(`[DeepSeek] Cache hit for ELI12`);
+      return cachedResult;
+    }
+
     try {
       const response = await axios.post(
         this.baseUrl,
@@ -141,7 +162,12 @@ export class DeepSeekService {
         }
       );
 
-      return JSON.parse(response.data.choices[0].message.content);
+      const result = JSON.parse(response.data.choices[0].message.content);
+      
+      // Cache for 24 hours (86400 seconds)
+      await RedisService.set(cacheKey, result, 86400);
+
+      return result;
     } catch (error: any) {
       console.error('DeepSeek ELI12 error:', error.message);
       throw new Error(`ELI12 simplify failed: ${error.message}`);
@@ -185,6 +211,13 @@ export class DeepSeekService {
       Determine the severity and provide a summary.
     `;
 
+    const cacheKey = `deepseek_interaction_${crypto.createHash('md5').update(userPrompt).digest('hex')}`;
+    const cachedResult = await RedisService.get<{ severity: string; summary: string }>(cacheKey);
+    if (cachedResult) {
+      console.log(`[DeepSeek] Cache hit for interaction: ${drug1} & ${drug2}`);
+      return cachedResult;
+    }
+
     try {
       const response = await axios.post(
         this.baseUrl,
@@ -205,10 +238,15 @@ export class DeepSeekService {
       );
 
       const content = JSON.parse(response.data.choices[0].message.content);
-      return {
+      const result = {
         severity: content.severity || 'unknown',
         summary: content.summary || 'Unable to determine interaction details.'
       };
+
+      // Cache for 24 hours (86400 seconds)
+      await RedisService.set(cacheKey, result, 86400);
+
+      return result;
     } catch (error: any) {
       console.error('DeepSeek Interaction Error:', error.message);
       return {
@@ -244,6 +282,13 @@ export class DeepSeekService {
       Summary: ${summary}
     `;
 
+    const cacheKey = `deepseek_interaction_eli12_${crypto.createHash('md5').update(userPrompt).digest('hex')}`;
+    const cachedResult = await RedisService.get<string>(cacheKey);
+    if (cachedResult) {
+      console.log(`[DeepSeek] Cache hit for interaction ELI12`);
+      return cachedResult;
+    }
+
     try {
       const response = await axios.post(
         this.baseUrl,
@@ -264,7 +309,12 @@ export class DeepSeekService {
       );
 
       const content = JSON.parse(response.data.choices[0].message.content);
-      return content.eli12_summary || summary;
+      const result = content.eli12_summary || summary;
+
+      // Cache for 24 hours (86400 seconds)
+      await RedisService.set(cacheKey, result, 86400);
+
+      return result;
     } catch (error: any) {
       console.error('DeepSeek Interaction ELI12 error:', error.message);
       return summary; // Fallback to original
