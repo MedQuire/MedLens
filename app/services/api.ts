@@ -35,12 +35,23 @@ export interface AISummary {
 }
 
 export interface InteractionResponse {
-  interactions: {
-    severity: 'high' | 'moderate' | 'low';
-    description: string;
-    drugs: string[];
-  }[];
+  /** Severity bucket returned by the AI / backend */
+  status: 'safe' | 'caution' | 'risky' | 'potential_interaction' | 'unknown';
+  /** Alias for status – also returned by the backend */
+  severity: 'safe' | 'caution' | 'risky' | 'potential_interaction' | 'unknown';
+  /** Plain-language summary */
+  message: string;
+  /** Duplicate of message for backward-compat */
   summary: string;
+  /** ELI12 simplified version of message */
+  eli12_summary?: string;
+  /** Optional per-drug interaction breakdown */
+  details?: {
+    interactions: {
+      drugKey: string;
+      interactions: string[];
+    }[];
+  };
 }
 
 export interface AutocompleteResponse {
