@@ -160,6 +160,8 @@ const HomeScreen: React.FC = () => {
 
         setState('success');
         console.log(`[Perf] Memory cache hit for: ${cacheKey}`);
+        UsageService.increment('search', isPro);
+        UsageService.getRemaining('search').then(setSearchRemaining);
         return;
       }
 
@@ -178,6 +180,8 @@ const HomeScreen: React.FC = () => {
 
         setState('success');
         console.log(`[Perf] Disk cache hit for: ${cacheKey}`);
+        UsageService.increment('search', isPro);
+        UsageService.getRemaining('search').then(setSearchRemaining);
         return;
       }
 
@@ -225,6 +229,10 @@ const HomeScreen: React.FC = () => {
       }
 
       setState('success');
+
+      // Track usage for the free-plan limit (counts each successful search)
+      UsageService.increment('search', isPro);
+      UsageService.getRemaining('search').then(setSearchRemaining);
 
       // Async persistence
       LocalStorageService.setCachedResult(cacheKey, response);
