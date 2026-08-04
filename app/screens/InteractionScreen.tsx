@@ -145,6 +145,7 @@ const InteractionScreen: React.FC = () => {
       await LocalStorageService.setCachedInteraction(selectedDrugs, response);
     } catch (error: any) {
       if (error.status === 403 && error.error === 'free_plan_limit') {
+        setUsageLimitFeature(error.feature || 'interaction');
         setUpgradeFeature(error.feature || 'interaction');
         return;
       }
