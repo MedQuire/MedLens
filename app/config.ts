@@ -1,6 +1,12 @@
 // API Configuration
 import Constants from 'expo-constants';
 
+// Tunnel domains where the API runs on a SEPARATE URL (Cloudflare/ngrok/loca), never the Expo host + port
+const TUNNEL_HOSTS = ['trycloudflare.com', 'ngrok-free.app', 'ngrok.io', 'loca.lt', 'railway.app', 'up.railway.app'];
+
+const isTunnelHost = (hostname: string): boolean =>
+  TUNNEL_HOSTS.some((t) => hostname.includes(t));
+
 const getApiBaseUrl = (): string => {
   // 1. Use explicit environment variable if set
   const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -13,16 +19,22 @@ const getApiBaseUrl = (): string => {
     const hostUri = Constants.expoConfig?.hostUri || (Constants.manifest as any)?.hostUri;
     
     if (hostUri) {
-      // hostUri format: "192.168.1.100:8082" or "localhost:8082"
+      // hostUri format: "192.168.1.100:8081" or "localhost:8081"
       const [hostname] = hostUri.split(':');
       
       // If hostname is localhost, keep it (for simulator/emulator)
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return 'http://localhost:3001';
       }
+
+      // If Expo is served through a tunnel, the backend lives on a DIFFERENT tunnel URL.
+      // Appending :3001 here produces a broken address that always times out.
+      if (isTunnelHost(hostname)) {
+        console.warn('[Config] Expo is running through a tunnel. EXPO_PUBLIC_API_BASE_URL must point to the backend tunnel URL.');
+        return 'http://localhost:3001';
+      }
       
       // Otherwise use the detected IP for physical device
-
       return `http://${hostname}:3001`;
     }
   }

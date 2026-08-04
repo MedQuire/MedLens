@@ -150,6 +150,10 @@ Start-Sleep -Seconds 5
 Write-Host "`n[4/4] Launching Expo Bundler..." -ForegroundColor Cyan
 $env:EXPO_PACKAGER_PROXY_URL = $frontendUrl
 
+# Point the app at the REAL backend tunnel (Metro inlines this into the JS bundle)
+$env:EXPO_PUBLIC_API_BASE_URL = $backendUrl
+Write-Host "EXPO_PUBLIC_API_BASE_URL set to: $backendUrl" -ForegroundColor Green
+
 # Build the correct Expo Go URL (Standard exp:// for Expo Go)
 $cleanUrl = $frontendUrl -replace "^https?://", ""
 $qrUrl = "exp://$cleanUrl"

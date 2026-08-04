@@ -145,12 +145,12 @@ async function main() {
   console.log(`URL: exp://${host}`);
   console.log("==========================================================\n");
   
-  console.log("📡 Starting Expo Bundler with cache clear...");
+  console.log(`📡 Starting Expo Bundler with cache clear... (API → ${backendTunnel.url})`);
   const expoProcess = spawn('npx', ['expo', 'start', '--clear'], { 
     cwd: APP_DIR, 
     shell: true, 
     stdio: 'inherit',
-    env: { ...process.env, EXPO_PACKAGER_PROXY_URL: frontendTunnel.url }
+    env: { ...process.env, EXPO_PACKAGER_PROXY_URL: frontendTunnel.url, EXPO_PUBLIC_API_BASE_URL: backendTunnel.url }
   });
 
   // Handle tunnel exits
