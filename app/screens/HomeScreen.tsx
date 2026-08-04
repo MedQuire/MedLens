@@ -279,6 +279,7 @@ const HomeScreen: React.FC = () => {
       // Handle free plan limit
       if (error.status === 403 && error.error === 'free_plan_limit') {
         console.log(`[Search] Free plan limit hit: ${error.feature}`);
+        setUsageLimitFeature(error.feature || 'search');
         setUpgradeFeature(error.feature || 'search');
         setState('empty');
         return;
