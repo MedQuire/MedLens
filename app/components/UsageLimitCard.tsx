@@ -12,11 +12,11 @@ interface UsageLimitCardProps {
   feature: UsageFeature;
 }
 
-const FEATURE_META: Record<UsageFeature, { icon: string; label: string; limit: number }> = {
-  search: { icon: 'search-outline', label: 'searches/day', limit: 5 },
-  save: { icon: 'archive-outline', label: 'medicine saves/day', limit: 3 },
-  export: { icon: 'share-outline', label: 'exports/day', limit: 2 },
-  interaction: { icon: 'git-network-outline', label: 'interaction checks/day', limit: 2 },
+const FEATURE_META: Record<UsageFeature, { icon: string; label: string }> = {
+  search: { icon: 'search-outline', label: 'searches' },
+  save: { icon: 'archive-outline', label: 'saves' },
+  export: { icon: 'share-outline', label: 'exports' },
+  interaction: { icon: 'git-network-outline', label: 'interaction checks' },
 };
 
 const UsageLimitCard: React.FC<UsageLimitCardProps> = ({ visible, onClose, feature }) => {
@@ -49,23 +49,15 @@ const UsageLimitCard: React.FC<UsageLimitCardProps> = ({ visible, onClose, featu
           </Text>
 
           <View style={[styles.limitBox, { backgroundColor: theme.colors.surfaceVariant }]}>
-            <Text style={[styles.limitTitle, { color: theme.colors.onSurface }]}>Your free plan allows:</Text>
-            <View style={styles.limitRow}>
-              <Ionicons name="search-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>5 searches/day - ({usageData.search.used}/{usageData.search.remaining})</Text>
-            </View>
-            <View style={styles.limitRow}>
-              <Ionicons name="archive-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>3 medicine saves/day - ({usageData.save.used}/{usageData.save.remaining})</Text>
-            </View>
-            <View style={styles.limitRow}>
-              <Ionicons name="share-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>2 exports/day - ({usageData.export.used}/{usageData.export.remaining})</Text>
-            </View>
-            <View style={styles.limitRow}>
-              <Ionicons name="git-network-outline" size={14} color={theme.colors.onSurfaceVariant} />
-              <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>2 interaction checks/day - ({usageData.interaction.used}/{usageData.interaction.remaining})</Text>
-            </View>
+            <Text style={[styles.limitTitle, { color: theme.colors.onSurface }]}>Today's usage</Text>
+            {(Object.keys(FEATURE_META) as UsageFeature[]).map((f) => (
+              <View key={f} style={styles.limitRow}>
+                <Ionicons name={FEATURE_META[f].icon as any} size={14} color={theme.colors.onSurfaceVariant} />
+                <Text style={[styles.limitText, { color: theme.colors.onSurfaceVariant }]}>
+                  {usageData[f].used} of {UsageService.DAILY_LIMITS[f]} {FEATURE_META[f].label} used
+                </Text>
+              </View>
+            ))}
           </View>
 
           <Text style={[styles.resetNote, { color: theme.colors.onSurfaceVariant }]}>
