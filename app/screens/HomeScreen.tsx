@@ -376,32 +376,29 @@ const HomeScreen: React.FC = () => {
     const drugNameLower = drugName.toLowerCase();
     const drugKey = drugNameLower.replace(/\s+/g, '-');
 
-    // 1. Optimistic Update is handled inside CabinetContext via state updates
-
-    // 2. Immediate Feedback: Show alert right away
-    Alert.alert('Saved', `${drugName} has been saved to your cabinet.`);
-
-    // 3. Trigger context method
-    (async () => {
-      try {
-        const description = baseResult.summary.what_it_does || undefined;
-        await addToCabinet(drugName, drugKey, description);
-        console.log(`[Cabinet] Add successful for: ${drugName} with desc: ${description}`);
-        UsageService.increment('save', isPro);
-        UsageService.getRemaining('save').then(setSaveRemaining);
-      } catch (error: any) {
-        console.error('[Cabinet] Save failed:', error);
-        if (error.status === 403 && error.error === 'free_plan_limit') {
-          setUpgradeFeature(error.feature || 'save');
-        }
-      }
-    })();
-
-    // 4. Reset search state immediately to return to default/empty state
+    // Reset search state immediately to return to default/empty state
     setState('empty');
     setBaseResult(null);
     setEli12Result(null);
     setQuery('');
+
+    // Save to cabinet, then confirm with an alert (on success) or show the limit popup (on 403)
+    try {
+      const description = baseResult.summary.what_it_does || undefined;
+      await addToCabinet(drugName, drugKey, description);
+      console.log(`[Cabinet] Add successful for: ${drugName} with desc: ${description}`);
+      Alert.alert('Saved', `${drugName} has been saved to your cabinet.`);
+      UsageService.increment('save', isPro);
+      UsageService.getRemaining('save').then(setSaveRemaining);
+    } catch (error: any) {
+      console.error('[Cabinet] Save failed:', error);
+      if (error.status === 403 && error.error === 'free_plan_limit') {
+        setUsageLimitFeature(error.feature || 'save');
+        setUpgradeFeature(error.feature || 'save');
+      } else {
+        Alert.alert('Error', `Could not save ${drugName}. Please try again.`);
+      }
+    }
   }, [baseResult, isGuest, getToken, isPro]);
 
   const handleExport = useCallback(async () => {
