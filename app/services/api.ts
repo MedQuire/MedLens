@@ -159,6 +159,10 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
       const error = new Error(`API Error ${response.status}: ${detailMsg}`);
       (error as any).status = response.status;
       (error as any).data = data;
+      (error as any).error = errorData.error;
+      (error as any).feature = errorData.feature;
+      (error as any).current_count = errorData.current_count;
+      (error as any).max_limit = errorData.max_limit;
       throw error;
     }
 
