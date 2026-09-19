@@ -154,7 +154,11 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
     if (!response.ok) {
       const errorData = data || {};
       const detailMsg = errorData.details || errorData.error || `Error ${response.status}`;
-      console.error(`[API] Request failed for URL: ${url} [Status: ${response.status}] [Details: ${detailMsg}]`);
+      if (response.status >= 500) {
+        console.error(`[API] Request failed for URL: ${url} [Status: ${response.status}] [Details: ${detailMsg}]`);
+      } else {
+        console.warn(`[API] Request failed for URL: ${url} [Status: ${response.status}] [Details: ${detailMsg}]`);
+      }
       
       const error = new Error(`API Error ${response.status}: ${detailMsg}`);
       (error as any).status = response.status;

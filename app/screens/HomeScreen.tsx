@@ -384,12 +384,6 @@ const HomeScreen: React.FC = () => {
     const drugNameLower = drugName.toLowerCase();
     const drugKey = drugNameLower.replace(/\s+/g, '-');
 
-    // Reset search state immediately to return to default/empty state
-    setState('empty');
-    setBaseResult(null);
-    setEli12Result(null);
-    setQuery('');
-
     // Save to cabinet, then confirm with an alert (on success) or show the limit popup (on 403)
     try {
       const description = baseResult.summary.what_it_does || undefined;
@@ -398,12 +392,19 @@ const HomeScreen: React.FC = () => {
       Alert.alert('Saved', `${drugName} has been saved to your cabinet.`);
       UsageService.increment('save', isPro);
       UsageService.getRemaining('save').then(setSaveRemaining);
+
+      // Reset search state after successful save
+      setState('empty');
+      setBaseResult(null);
+      setEli12Result(null);
+      setQuery('');
     } catch (error: any) {
-      console.error('[Cabinet] Save failed:', error);
-      if (error.status === 403 && error.error === 'free_plan_limit') {
+      if (error?.status === 403 || error?.error === 'free_plan_limit') {
+        console.warn('[Cabinet] Free plan save limit reached');
         setUsageLimitFeature(error.feature || 'save');
         setUpgradeFeature(error.feature || 'save');
       } else {
+        console.error('[Cabinet] Save failed:', error);
         Alert.alert('Error', `Could not save ${drugName}. Please try again.`);
       }
     }

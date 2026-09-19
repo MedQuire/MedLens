@@ -103,8 +103,12 @@ export const CabinetProvider: React.FC<{ children: React.ReactNode }> = ({ child
           return updated;
         });
       }
-    } catch (error) {
-      console.error('[CabinetContext] Add failed:', error);
+    } catch (error: any) {
+      if (error?.status === 403 || error?.error === 'free_plan_limit') {
+        console.warn('[CabinetContext] Add limit reached:', error?.message || error);
+      } else {
+        console.error('[CabinetContext] Add failed:', error);
+      }
       throw error;
     }
   }, [user, isGuest, getToken]);
