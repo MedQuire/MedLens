@@ -779,7 +779,7 @@ const makeStyles = (theme: ThemeContextType) => StyleSheet.create({
     marginTop: 12,
   },
   staticHeadlineWrapper: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 0,
