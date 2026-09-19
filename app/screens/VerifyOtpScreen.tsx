@@ -39,7 +39,7 @@ const VerifyOtpScreen = ({ navigation, route }: Props) => {
   const [timer, setTimer] = useState(60);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (timer > 0) {
       interval = setInterval(() => {
         setTimer((prev) => prev - 1);

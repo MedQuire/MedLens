@@ -2,9 +2,7 @@
   "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
-    "skipLibCheck": true,
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0"
+    "skipLibCheck": true
   },
   "exclude": [
     "node_modules",
