@@ -3,8 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, KeyboardAv
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import type { DrawerNavigationProp } from '@react-navigation/drawer';
-import { DrawerParamList, RootStackParamList } from '../navigation/AppNavigator';
 
 import { useTheme, ThemeContextType } from '../theme/ThemeProvider';
 import { useAuth } from '../context/AuthContext';
@@ -32,10 +30,10 @@ import UsageLimitCard from '../components/UsageLimitCard';
 
 type AppState = 'empty' | 'loading' | 'success' | 'partial' | 'notFound' | 'error';
 
-const HomeScreen: React.FC = () => {
+const HomeScreen: React.FC<{ onOpenDrawer?: () => void }> = ({ onOpenDrawer }) => {
   const theme = useTheme();
   const { user, isGuest, isPro, getToken } = useAuth();
-  const navigation = (useNavigation as any)() as DrawerNavigationProp<DrawerParamList>;
+  const navigation = (useNavigation as any)();
   const route = useRoute() as { params?: { searchQuery?: string } };
   const insets = useSafeAreaInsets();
   const styles = makeStyles(theme);
@@ -586,7 +584,7 @@ const HomeScreen: React.FC = () => {
 
       {/* Top Navigation */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.openDrawer()}>
+        <TouchableOpacity onPress={() => (onOpenDrawer ? onOpenDrawer() : navigation.openDrawer?.())}>
           <Ionicons name="menu-outline" size={28} color={theme.colors.onSurfaceVariant} />
         </TouchableOpacity>
         <View style={styles.headerActions}>

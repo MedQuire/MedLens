@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, DeviceEventEmitter, Animated, Easing, Modal, Pressable } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, ThemeContextType } from '../theme/ThemeProvider';
 import { LocalStorageService } from '../services/storage';
@@ -41,14 +40,7 @@ export type RootStackParamList = {
 } & (typeof FEATURES.ENABLE_PRO extends true ? { Upgrade: undefined } : {});
 
 
-export type DrawerParamList = {
-  HomeDrawer: { searchQuery?: string };
-  CabinetDrawer: undefined;
-  SettingsDrawer: undefined;
-};
-
 const Stack = (createNativeStackNavigator as any)();
-const Drawer = (createDrawerNavigator as any)();
 
 // Global cache to avoid flicker when drawer opens
 let drawerHistoryCache: string[] | null = null;
@@ -60,13 +52,16 @@ const clearDrawerHistoryCache = () => {
 import { SvgXml } from 'react-native-svg';
 import { LOGO_SVG } from '../assets/logo_svg';
 
-const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
+const DRAWER_WIDTH = 300;
+
+const HomeDrawer: React.FC = () => {
   const theme = useTheme();
   const navigation = useNavigation();
   const { signOut, isGuest, user, getToken } = useAuth();
+  const [isOpen, setIsOpen] = React.useState(false);
   const [history, setHistory] = React.useState<string[] | null>(drawerHistoryCache);
   const [isLoading, setIsLoading] = React.useState(drawerHistoryCache === null);
-  const drawerStatus = useDrawerStatus();
+  const drawerTranslateX = React.useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
   const loadHistory = React.useCallback(async (isRetry = false) => {
     // If not authenticated or in guest mode, don't attempt API call
@@ -79,10 +74,9 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
     }
 
     try {
-      console.log(`[Drawer] Refreshing history for ${user ? (isGuest ? 'Guest' : user.id) : 'Unauthenticated'}`);
       let serverSearches: string[] = [];
       let localSearches: string[] = await LocalStorageService.getRecentSearches(isGuest ? null : user?.id);
-      
+
       // Start with local searches for instant feedback
       setHistory(localSearches);
       setIsLoading(true);
@@ -91,8 +85,7 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
       if (token && !isGuest) {
         try {
           serverSearches = await api.getRecentSearches(token);
-          console.log(`[Drawer] API fetch success: ${serverSearches.length} items`);
-          
+
           // Merge server and local, prioritizing server but keeping unique items
           const combined = Array.from(new Set([...serverSearches, ...localSearches])).slice(0, 10);
           setHistory(combined);
@@ -116,12 +109,29 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
     }
   }, [user, isGuest, getToken]);
 
-  // Update history whenever drawer opens or state changes
+  const openDrawer = React.useCallback(() => {
+    drawerTranslateX.setValue(-DRAWER_WIDTH);
+    setIsOpen(true);
+  }, [drawerTranslateX]);
+
+  const closeDrawer = React.useCallback((onCloseDone?: () => void) => {
+    Animated.timing(drawerTranslateX, {
+      toValue: -DRAWER_WIDTH,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsOpen(false);
+      if (onCloseDone) onCloseDone();
+    });
+  }, [drawerTranslateX]);
+
+  // Update history whenever drawer opens
   React.useEffect(() => {
-    if (drawerStatus === 'open') {
+    if (isOpen) {
       loadHistory();
     }
-  }, [drawerStatus, loadHistory]);
+  }, [isOpen, loadHistory]);
 
   React.useEffect(() => {
     const historySub = DeviceEventEmitter.addListener('history_updated', () => loadHistory());
@@ -131,8 +141,10 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
   }, [loadHistory]);
 
   const handleHistoryPress = (query: string) => {
-    props.navigation.navigate('HomeDrawer', { searchQuery: query });
-    props.navigation.closeDrawer();
+    // Close the drawer before triggering the search on Home
+    closeDrawer(() => {
+      (navigation as any).setParams?.({ searchQuery: query });
+    });
   };
 
   const clearHistory = async () => {
@@ -156,14 +168,14 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Sign Out', 
-        style: 'destructive', 
+      {
+        text: 'Sign Out',
+        style: 'destructive',
         onPress: async () => {
           try {
             await signOut();
             clearDrawerHistoryCache();
-            props.navigation.closeDrawer();
+            closeDrawer();
             (navigation as any).reset({
               index: 0,
               routes: [{ name: 'Login' }],
@@ -171,82 +183,104 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
           } catch (error) {
             console.error('Logout error:', error);
           }
-        } 
+        },
       },
     ]);
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <View style={styles.drawerHeader}>
-        <View style={styles.logoWrapper}>
-          <SvgXml xml={LOGO_SVG} width={120} height={40} preserveAspectRatio="xMinYMid meet" />
-        </View>
-      </View>
+    <View style={{ flex: 1 }}>
+      <HomeScreen onOpenDrawer={openDrawer} />
 
-      <View style={styles.historySection}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.outline }]}>Recent Searches</Text>
-          {history && history.length > 0 && (
-            <TouchableOpacity onPress={clearHistory}>
-              <Text style={[styles.clearText, { color: theme.colors.primary }]}>Clear</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {isLoading && (!history || history.length === 0) ? (
-          <View style={styles.loadingHistory}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={[styles.loadingText, { color: theme.colors.outline }]}>Refreshing...</Text>
-          </View>
-        ) : !history || history.length === 0 ? (
-          <View style={styles.emptyHistory}>
-            <Ionicons name="time-outline" size={48} color={theme.colors.outlineVariant} />
-            <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
-              You do not have any recent searches yet
-            </Text>
-          </View>
-        ) : (
-          <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
-            {history.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.historyItem}
-                onPress={() => handleHistoryPress(item)}
-              >
-                <Text style={[styles.historyText, { color: theme.colors.onSurface }]} numberOfLines={1}>
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-      </View>
-
-    </View>
-  );
-};
-
-const DrawerNavigator: React.FC = () => {
-  const theme = useTheme();
-  return (
-    <Drawer.Navigator
-      useLegacyImplementation={false}
-      drawerContent={(props: DrawerContentComponentProps) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        headerShown: false,
-        drawerStyle: { backgroundColor: theme.colors.background, width: 300 },
-        swipeEnabled: false,
-      }}
-    >
-      <Drawer.Screen
-        name="HomeDrawer"
-        component={HomeScreen}
-        options={{
-          drawerLabel: 'Home',
+      <Modal
+        visible={isOpen}
+        transparent
+        statusBarTranslucent
+        animationType="none"
+        onRequestClose={() => closeDrawer()}
+        onShow={() => {
+          Animated.timing(drawerTranslateX, {
+            toValue: 0,
+            duration: 250,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start();
         }}
-      />
-    </Drawer.Navigator>
+      >
+        <View style={styles.drawerRoot}>
+          <Pressable
+            style={styles.drawerBackdrop}
+            onPress={() => closeDrawer()}
+            accessibilityRole="button"
+            accessibilityLabel="Close drawer"
+          />
+
+          <Animated.View
+            style={[
+              styles.drawerPanel,
+              {
+                transform: [{ translateX: drawerTranslateX }],
+                backgroundColor: theme.colors.background,
+              },
+            ]}
+          >
+            <View style={styles.drawerHeader}>
+              <View style={styles.logoWrapper}>
+                <SvgXml xml={LOGO_SVG} width={120} height={40} preserveAspectRatio="xMinYMid meet" />
+              </View>
+              <TouchableOpacity
+                onPress={() => closeDrawer()}
+                style={styles.drawerCloseButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close drawer"
+              >
+                <Ionicons name="close" size={24} color={theme.colors.outline} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.historySection}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.outline }]}>Recent Searches</Text>
+                {history && history.length > 0 && (
+                  <TouchableOpacity onPress={clearHistory}>
+                    <Text style={[styles.clearText, { color: theme.colors.primary }]}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {isLoading && (!history || history.length === 0) ? (
+                <View style={styles.loadingHistory}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: theme.colors.outline }]}>Refreshing...</Text>
+                </View>
+              ) : !history || history.length === 0 ? (
+                <View style={styles.emptyHistory}>
+                  <Ionicons name="time-outline" size={48} color={theme.colors.outlineVariant} />
+                  <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
+                    You do not have any recent searches yet
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
+                  {history.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.historyItem}
+                      onPress={() => handleHistoryPress(item)}
+                    >
+                      <Text style={[styles.historyText, { color: theme.colors.onSurface }]} numberOfLines={1}>
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
@@ -282,7 +316,7 @@ const AppNavigator = () => {
             component={ResetPasswordScreen} 
             options={{ presentation: 'push', gestureEnabled: false }} 
           />
-          <Stack.Screen name="Home" component={DrawerNavigator} />
+          <Stack.Screen name="Home" component={HomeDrawer} />
           <Stack.Screen name="Cabinet" component={CabinetScreen} />
           <Stack.Screen 
             name="Settings" 
@@ -308,10 +342,30 @@ const AppNavigator = () => {
 };
 
 const styles = StyleSheet.create({
+  drawerRoot: {
+    flex: 1,
+  },
+  drawerBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  drawerPanel: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: DRAWER_WIDTH,
+  },
   drawerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 20,
+  },
+  drawerCloseButton: {
+    marginTop: 4,
   },
   logoWrapper: {
     height: 40,
