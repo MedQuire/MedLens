@@ -166,21 +166,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (signUpData.user) {
         console.log('[Auth] SignUp successful, creating profile for user:', signUpData.user.id);
         
-        // Explicitly create profile in database
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: signUpData.user.id,
-            email: signUpData.user.email,
-            full_name: displayName,
-            created_at: new Date().toISOString(),
-          });
+        // Attempt profile insert if session active (otherwise DB trigger handles it upon email confirm/signup)
+        if (signUpData.session) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: signUpData.user.id,
+              email: signUpData.user.email,
+              full_name: displayName,
+              created_at: new Date().toISOString(),
+            });
 
-        if (profileError) {
-          console.error('[Auth] Profile creation failed:', profileError.message);
-          // We don't throw here to avoid blocking the user if they've technically signed up
-        } else {
-          console.log('[Auth] Profile created successfully');
+          if (profileError) {
+            console.log('[Auth] Profile creation note (handled by DB trigger or RLS):', profileError.message);
+          } else {
+            console.log('[Auth] Profile created successfully');
+          }
         }
 
         // Force session update/refresh logic
@@ -287,34 +288,67 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('[GoogleAuth] Starting Google Auth...');
 
-      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-
-      // Configure Google Sign In
-      GoogleSignin.configure({
-        webClientId: '990313463556-ve95uh0hvtsoknbpr0s39uuvhi1uf7g7.apps.googleusercontent.com',
-      });
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const { idToken } = await GoogleSignin.getTokens();
-
-      if (!idToken) {
-        return { error: new Error('No ID token received') };
+      let googleSigninModule: any = null;
+      try {
+        const mod = require('@react-native-google-signin/google-signin');
+        if (mod && mod.GoogleSignin) {
+          googleSigninModule = mod.GoogleSignin;
+        }
+      } catch (e) {
+        console.log('[GoogleAuth] Native GoogleSignin module not available in standard Expo Go');
       }
 
-      // Sign in to Supabase with Google ID token
-      const { data, error } = await supabase.auth.signInWithIdToken({
+      if (googleSigninModule) {
+        try {
+          googleSigninModule.configure({
+            webClientId: '990313463556-ve95uh0hvtsoknbpr0s39uuvhi1uf7g7.apps.googleusercontent.com',
+          });
+          await googleSigninModule.hasPlayServices();
+          const userInfo = await googleSigninModule.signIn();
+          const { idToken } = await googleSigninModule.getTokens();
+
+          if (idToken) {
+            const { data, error } = await supabase.auth.signInWithIdToken({
+              provider: 'google',
+              token: idToken,
+            });
+
+            if (error) {
+              console.error('[GoogleAuth] Supabase error:', error);
+              return { error };
+            }
+
+            await LocalStorageService.setOnboardingCompleted();
+            await LocalStorageService.setHasAuthenticatedBefore();
+            console.log('[GoogleAuth] Native Google Auth Success!');
+            return { error: null };
+          }
+        } catch (nativeError: any) {
+          if (nativeError?.message?.includes('TurboModuleRegistry') || nativeError?.message?.includes('RNGoogleSignin')) {
+            console.warn('[GoogleAuth] RNGoogleSignin native binary missing (Expo Go environment detected)');
+          } else {
+            console.error('[GoogleAuth] Native error:', nativeError);
+            return { error: nativeError };
+          }
+        }
+      }
+
+      // Fallback: Web OAuth for Expo Go environments
+      console.log('[GoogleAuth] Initiating Web OAuth redirect...');
+      const redirectUrl = AuthSession.makeRedirectUri({ scheme: 'medquire' });
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        token: idToken,
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: false,
+        },
       });
 
       if (error) {
-        console.error('[GoogleAuth] Supabase error:', error);
+        console.error('[GoogleAuth] Web OAuth error:', error);
         return { error };
       }
 
-      await LocalStorageService.setOnboardingCompleted();
-      await LocalStorageService.setHasAuthenticatedBefore();
-      console.log('[GoogleAuth] Success!');
       return { error: null };
     } catch (error: any) {
       console.error('[GoogleAuth] Error:', error);
