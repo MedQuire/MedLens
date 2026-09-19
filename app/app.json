@@ -64,7 +64,12 @@
       "expo-sharing",
       "expo-splash-screen",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4782ce14-e16a-4b4d-a7c0-c79a804dd5a8"
+      }
+    }
   }
 }
 
