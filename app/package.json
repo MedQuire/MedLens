@@ -58,12 +58,12 @@
     "@types/babel__template": "^7.4.4",
     "@types/istanbul-lib-report": "^3.0.3",
     "@types/node": "^25.6.0",
-    "@types/react": "~19.1.0",
+    "@types/react": "~19.2.4",
     "@types/yargs-parser": "^21.0.3",
-    "babel-preset-expo": "~54.0.0",
+    "babel-preset-expo": "~57.0.0",
     "cloudflared": "^0.7.1",
     "qrcode": "^1.5.3",
-    "typescript": "~5.9.2"
+    "typescript": "~6.0.3"
   },
   "overrides": {
     "follow-redirects": "^1.15.4",
