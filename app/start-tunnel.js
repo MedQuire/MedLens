@@ -121,36 +121,16 @@ async function main() {
   
   await startBackend();
   
-  // Tunnel for Backend (3001)
+  // Tunnel for Backend (3001) via Cloudflared
   const backendTunnel = await startTunnel('http://127.0.0.1:3001', 'Backend');
   updateEnv(backendTunnel.url);
   
-  // Tunnel for Frontend (8081)
-  const frontendTunnel = await startTunnel('http://127.0.0.1:8081', 'Frontend');
-  const host = frontendTunnel.url.replace('https://', '');
-
-  console.log("\n==========================================================");
-  console.log("📱 SCAN THIS QR CODE WITH YOUR PHONE CAMERA");
-  console.log("==========================================================\n");
-
-  // Promisify QR code generation to keep main clean
-  const qrStr = await new Promise((resolve) => {
-    qrCode.toString(`exp://${host}`, { type: 'terminal', small: true }, (err, str) => {
-      resolve(err ? "Failed to generate QR code" : str);
-    });
-  });
-  console.log(qrStr);
-  
-  console.log("==========================================================");
-  console.log(`URL: exp://${host}`);
-  console.log("==========================================================\n");
-  
-  console.log(`📡 Starting Expo Bundler with cache clear... (API → ${backendTunnel.url})`);
-  const expoProcess = spawn('npx', ['expo', 'start', '--clear'], { 
+  console.log(`\n📡 Starting Expo Bundler in Tunnel mode... (API → ${backendTunnel.url})`);
+  const expoProcess = spawn('npx', ['expo', 'start', '--tunnel', '--clear'], { 
     cwd: APP_DIR, 
     shell: true, 
     stdio: 'inherit',
-    env: { ...process.env, EXPO_PACKAGER_PROXY_URL: frontendTunnel.url, EXPO_PUBLIC_API_BASE_URL: backendTunnel.url }
+    env: { ...process.env, EXPO_PUBLIC_API_BASE_URL: backendTunnel.url }
   });
 
   // Handle tunnel exits
@@ -162,7 +142,6 @@ async function main() {
 
   expoProcess.on('exit', (code) => handleExit('Expo Bundler', code));
   backendTunnel.process.on('exit', (code) => handleExit('Backend Tunnel', code));
-  frontendTunnel.process.on('exit', (code) => handleExit('Frontend Tunnel', code));
 
   // Catch Ctrl+C
   process.on('SIGINT', () => {
