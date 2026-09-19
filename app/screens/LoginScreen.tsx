@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, TextInput, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Image, BackHandler, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, TextInput, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import { SvgXml } from 'react-native-svg';
-import { GOOGLE_SVG } from '../assets/google_svg';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -40,8 +38,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     general: '',
   });
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const { signIn, signInWithGoogle, isGuest, continueAsGuest } = useAuth();
+  const { signIn, isGuest } = useAuth();
   const [loginSuccess, setLoginSuccess] = useState(false);
 
   // Safe navigation: Wait for global auth state to catch up before navigating
@@ -111,23 +108,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       setLoading(false);
     }
   };
-
-  const handleGoogleAuth = async () => {
-    setGoogleLoading(true);
-    const { error } = await signInWithGoogle();
-    setGoogleLoading(false);
-    
-    if (error && error.message !== 'User cancelled sign-in') {
-      Alert.alert('Authentication Failed', error.message);
-    } else if (!error) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      });
-    }
-  };
-
-
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
@@ -234,40 +214,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.socialSection}>
-            <View style={styles.dividerContainer}>
-              <View style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
-              <Text style={[styles.dividerText, { color: theme.colors.onSurfaceVariant }]}>or</Text>
-              <View style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
-            </View>
-
-            <TouchableOpacity 
-              style={[
-                styles.socialButton, 
-                { 
-                  backgroundColor: theme.colors.background,
-                  borderColor: theme.colors.primary,
-                }
-              ]}
-              activeOpacity={0.7}
-              onPress={handleGoogleAuth}
-              disabled={loading || googleLoading}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color={theme.colors.primary} />
-              ) : (
-                <>
-                  <SvgXml 
-                    xml={GOOGLE_SVG} 
-                    width={24} 
-                    height={24} 
-                  />
-                  <Text style={[styles.socialButtonText, { color: theme.colors.primary }]}>Continue with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: theme.colors.onSurfaceVariant }]}>
               Don't have an account? <Text style={{ color: theme.colors.primary, fontWeight: '600' }} onPress={() => navigation.navigate('SignUp')}>Create Account</Text>
@@ -368,42 +314,6 @@ const makeStyles = (theme: ThemeContextType) => StyleSheet.create({
   forgotPasswordText: {
     fontSize: 13,
     fontWeight: '600',
-  },
-  socialSection: {
-    marginTop: 20,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
-    gap: 16,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    opacity: 0.5,
-  },
-  dividerText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  socialButton: {
-    flexDirection: 'row',
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    gap: 12,
-  },
-  socialButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  googleIcon: {
-    width: 24,
-    height: 24,
   },
   footer: {
     marginTop: 32,
