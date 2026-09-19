@@ -21,6 +21,7 @@ type Props = {
   route: {
     params: {
       email: string;
+      mode?: 'signup' | 'recovery';
     };
   };
 };
@@ -28,8 +29,9 @@ type Props = {
 const VerifyOtpScreen = ({ navigation, route }: Props) => {
   const theme = useTheme();
   const styles = makeStyles(theme);
-  const { email } = route.params;
-  const { verifyResetOtp, sendResetOtp } = useAuth();
+  const { email, mode = 'recovery' } = route.params;
+  const isSignup = mode === 'signup';
+  const { verifyResetOtp, sendResetOtp, verifySignupOtp, resendSignupOtp } = useAuth();
 
   const [otp, setOtp] = useState('');
   const [focusedInput, setFocusedInput] = useState<boolean>(false);
@@ -58,9 +60,14 @@ const VerifyOtpScreen = ({ navigation, route }: Props) => {
     setError('');
 
     try {
-      const { error: verifyError } = await verifyResetOtp(email, otp);
+      const { error: verifyError } = isSignup
+        ? await verifySignupOtp(email, otp)
+        : await verifyResetOtp(email, otp);
       if (verifyError) {
         setError(verifyError.message || 'Invalid code. Please try again.');
+      } else if (isSignup) {
+        Alert.alert('Email Verified', 'Your email has been verified. You can now log in.');
+        navigation.navigate('Login');
       } else {
         navigation.navigate('ResetPassword', { email });
       }
@@ -78,7 +85,9 @@ const VerifyOtpScreen = ({ navigation, route }: Props) => {
     setError('');
     
     try {
-      const { error: resendError } = await sendResetOtp(email);
+      const { error: resendError } = isSignup
+        ? await resendSignupOtp(email)
+        : await sendResetOtp(email);
       if (resendError) {
         setError(resendError.message);
       } else {

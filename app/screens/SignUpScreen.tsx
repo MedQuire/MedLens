@@ -113,11 +113,7 @@ const SignUpScreen = ({ navigation }: SignUpScreenProps) => {
             Alert.alert('Sign Up Failed', error.message);
           }
         } else if (needsEmailConfirmation) {
-          Alert.alert(
-            'Check your email',
-            'We have sent you an email with a confirmation link. Please verify your email before logging in.',
-            [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-          );
+          navigation.navigate('VerifyOtp', { email: form.email, mode: 'signup' });
         } else {
           // Success! Mark as success and wait for useEffect to navigate
           setSignUpSuccess(true);

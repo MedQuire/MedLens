@@ -34,7 +34,7 @@ export type RootStackParamList = {
   Cabinet: undefined;
   Settings: undefined;
   ForgotPassword: undefined;
-  VerifyOtp: { email: string };
+  VerifyOtp: { email: string; mode?: 'signup' | 'recovery' };
   ResetPassword: { email: string };
   Interaction: { drugKeys?: string[] };
 } & (typeof FEATURES.ENABLE_PRO extends true ? { Upgrade: undefined } : {});

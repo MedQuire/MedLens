@@ -32,6 +32,8 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   sendResetOtp: (email: string) => Promise<{ error: AuthError | null }>;
   verifyResetOtp: (email: string, token: string) => Promise<{ error: AuthError | null }>;
+  resendSignupOtp: (email: string) => Promise<{ error: AuthError | null }>;
+  verifySignupOtp: (email: string, token: string) => Promise<{ error: AuthError | null }>;
   updatePassword: (password: string) => Promise<{ error: AuthError | null }>;
   completeOnboarding: () => Promise<void>;
   isPro: boolean;
@@ -527,6 +529,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const resendSignupOtp = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+      return { error };
+    } catch (error) {
+      console.error('Resend signup OTP error:', error);
+      return { error: error as AuthError };
+    }
+  };
+
+  const verifySignupOtp = async (email: string, token: string) => {
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup'
+      });
+      return { error };
+    } catch (error) {
+      console.error('Verify signup OTP error:', error);
+      return { error: error as AuthError };
+    }
+  };
+
   const updatePassword = async (password: string) => {
     try {
       const { error } = await supabase.auth.updateUser({
@@ -586,6 +615,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resetPassword,
     sendResetOtp,
     verifyResetOtp,
+    resendSignupOtp,
+    verifySignupOtp,
     updatePassword,
     completeOnboarding,
     isPro,

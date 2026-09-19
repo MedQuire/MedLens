@@ -53,7 +53,7 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
       if (resetError) {
         setError(resetError.message);
       } else {
-        navigation.navigate('VerifyOtp', { email });
+        navigation.navigate('VerifyOtp', { email, mode: 'recovery' });
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
