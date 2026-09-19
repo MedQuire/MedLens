@@ -59,7 +59,8 @@
       "expo-asset",
       "expo-audio",
       "expo-speech-recognition",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {
