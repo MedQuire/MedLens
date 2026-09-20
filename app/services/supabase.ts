@@ -16,6 +16,12 @@ const fetchWithTimeout = (input: RequestInfo | URL, init?: RequestInit): Promise
 };
 
 // Initialize Supabase client
+if (!Config.SUPABASE.URL || !Config.SUPABASE.ANON_KEY) {
+  throw new Error(
+    '[MedQuire] Missing Supabase credentials. EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY must be set at build time, otherwise the app will crash immediately on launch.'
+  );
+}
+
 export const supabase = createClient(
   Config.SUPABASE.URL,
   Config.SUPABASE.ANON_KEY,

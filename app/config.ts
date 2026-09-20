@@ -1,5 +1,6 @@
 // API Configuration
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // Tunnel domains where the API runs on a SEPARATE URL (Cloudflare/ngrok/loca), never the Expo host + port
 const TUNNEL_HOSTS = ['trycloudflare.com', 'ngrok-free.app', 'ngrok.io', 'loca.lt', 'railway.app', 'up.railway.app'];
@@ -44,6 +45,12 @@ const getApiBaseUrl = (): string => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+if (!__DEV__ && (Platform.OS === 'android' || Platform.OS === 'ios')) {
+  if (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')) {
+    console.error('[Config] FATAL: EXPO_PUBLIC_API_BASE_URL is not set for this release build. Backend URL falls back to', API_BASE_URL);
+  }
+}
 
 // Debug logging for configuration
 console.log('[Config] API_BASE_URL:', API_BASE_URL);
