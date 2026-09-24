@@ -58,7 +58,6 @@
     "plugins": [
       "expo-font",
       "expo-asset",
-      "expo-audio",
       "expo-speech-recognition",
       "@react-native-google-signin/google-signin",
       "expo-web-browser",
